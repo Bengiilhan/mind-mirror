@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+.env.*
+
+# Alembic
+alembic/versions/
+
+# VSCode
+.vscode/
+
+# Node/React
+node_modules/
+build/
+dist/
+
+# Log files
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test/coverage
+coverage/
+*.cover
+*.py,cover
+.hypothesis/
+
+# React/Tailwind
+frontend/.env
+frontend/node_modules/
+frontend/dist/
+
+# Backend
+backend/.env
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+
+# Misc
+*.sqlite3 

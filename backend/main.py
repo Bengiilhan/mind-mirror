@@ -1,0 +1,183 @@
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from datetime import timedelta
+import os
+from dotenv import load_dotenv
+from typing import Optional
+from datetime import datetime
+
+from database import engine, get_db
+from models import Base, User, Entry, Analysis
+from schemas import UserCreate, UserLogin, UserResponse, Token, EntryCreate, EntryUpdate, EntryResponse
+from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from analyze import router as analyze_router, analyze_entry
+from typing import List
+
+# Load environment variables
+load_dotenv()
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Zihin Aynası API", version="1.0.0")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Authentication endpoints
+@app.post("/register", response_model=UserResponse)
+def register(user: UserCreate, db: Session = Depends(get_db)):
+    # Check if user already exists
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user.password)
+    db_user = User(email=user.email, password_hash=hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    return db_user
+
+@app.post("/login", response_model=Token)
+def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
+    # Find user
+    user = db.query(User).filter(User.email == user_credentials.email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    # Verify password
+    if not verify_password(user_credentials.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email}, expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/me", response_model=UserResponse)
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    return current_user
+
+# Entry endpoints (protected)
+@app.post("/entries/", response_model=EntryResponse)
+def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_entry = Entry(
+        text=entry.text,
+        mood_score=entry.mood_score,
+        user_id=current_user.id
+    )
+    db.add(db_entry)
+    db.commit()
+    db.refresh(db_entry)
+
+    # ✅ Analiz sonucunu al ve Analysis tablosuna kaydet
+    try:
+        analysis_result = analyze_entry(entry.text)
+        db_analysis = Analysis(
+            entry_id=db_entry.id,
+            result=analysis_result 
+        )
+        db.add(db_analysis)
+        db.commit()
+    except Exception as e:
+        print("Analiz başarısız:", e)
+
+    return db_entry
+
+
+import json  # başta ekle
+
+@app.get("/entries/", response_model=List[EntryResponse])
+def get_entries(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    entries = (
+        db.query(Entry)
+        .filter(Entry.user_id == current_user.id)
+        .order_by(Entry.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for entry in entries:
+        analysis_obj = entry.analysis
+
+        if analysis_obj and analysis_obj.result:
+            raw = analysis_obj.result
+            if isinstance(raw, str):
+                try:
+                    parsed_analysis = json.loads(raw)
+                except json.JSONDecodeError:
+                    parsed_analysis = None
+            elif isinstance(raw, dict):
+                parsed_analysis = raw
+            else:
+                parsed_analysis = None
+        else:
+            parsed_analysis = None
+
+        entry_dict = {
+            "id": entry.id,
+            "text": entry.text,
+            "mood_score": entry.mood_score,
+            "created_at": entry.created_at,
+            "user_id": entry.user_id,
+            "analysis": parsed_analysis  # DİKKAT: Burada dict olmalı!
+        }
+
+        result.append(EntryResponse(**entry_dict))
+        return result
+
+
+
+    @app.put("/entries/{entry_id}", response_model=EntryResponse)
+    def update_entry(entry_id: int, entry_update: EntryUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+        db_entry = db.query(Entry).filter(Entry.id == entry_id, Entry.user_id == current_user.id).first()
+        if not db_entry:
+            raise HTTPException(status_code=404, detail="Entry not found")
+        
+        if entry_update.text is not None:
+            db_entry.text = entry_update.text
+        if entry_update.mood_score is not None:
+            db_entry.mood_score = entry_update.mood_score
+        
+        db.commit()
+        db.refresh(db_entry)
+        return db_entry
+
+@app.delete("/entries/{entry_id}")
+def delete_entry(entry_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_entry = db.query(Entry).filter(Entry.id == entry_id, Entry.user_id == current_user.id).first()
+    if not db_entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    
+    db.delete(db_entry)
+    db.commit()
+    return {"message": "Entry deleted successfully"}
+
+# Health check
+@app.get("/")
+def read_root():
+    return {"message": "Zihin Aynası API is running"}
+    
+app.include_router(analyze_router, prefix="/analyze", tags=["AI Analysis"])
