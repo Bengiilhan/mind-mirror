@@ -97,8 +97,9 @@ export default function LoginForm() {
           <form onSubmit={handleSubmit}>
             <VStack spacing={4}>
               <FormControl isRequired>
-                <FormLabel>E-posta</FormLabel>
+                <FormLabel htmlFor="email">E-posta</FormLabel>
                 <Input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -109,9 +110,10 @@ export default function LoginForm() {
               </FormControl>
 
               <FormControl isRequired>
-                <FormLabel>Şifre</FormLabel>
+                <FormLabel htmlFor="password">Şifre</FormLabel>
                 <InputGroup size="lg">
                   <Input
+                    id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

@@ -15,6 +15,7 @@ import {
   useColorModeValue,
   HStack,
   IconButton,
+  Badge,
 } from "@chakra-ui/react";
 import { ArrowBackIcon } from "@chakra-ui/icons";
 import { useAuth } from "../hooks/useAuth.jsx";
@@ -27,6 +28,7 @@ export default function NewEntry() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [analysis, setAnalysis] = useState("");
+  const [savedEntry, setSavedEntry] = useState(null);
 
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -55,11 +57,12 @@ export default function NewEntry() {
     setError("");
     setSuccess("");
     setAnalysis("");
+    setSavedEntry(null);
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       // 1. Girişi kaydet
-      const res = await fetch("http://localhost:8000/entries", {
+      const res = await fetch("http://localhost:8000/entries/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -76,7 +79,11 @@ export default function NewEntry() {
         const errorData = await res.json();
         throw new Error(errorData.detail || "Giriş oluşturulamadı");
       }
+      
+      const savedData = await res.json();
+      setSavedEntry(savedData);
       setSuccess("Günlük girişi başarıyla kaydedildi!");
+      
       // 2. Analiz API'sine istek at
       const analyzeRes = await fetch("http://localhost:8000/analyze", {
         method: "POST",
@@ -89,9 +96,11 @@ export default function NewEntry() {
       } else {
         setAnalysis("Analiz alınamadı.");
       }
-      setContent("");
-      setMood(null);
-      // navigate işlemini kaldırıyoruz, analiz gösterilecek
+      
+      // Form temizleme kaldırıldı - artık form temizlenmiyor
+      // setContent("");
+      // setMood(null);
+      
     } catch (err) {
       setError(err.message || "Bir hata oluştu");
     } finally {
@@ -137,85 +146,142 @@ export default function NewEntry() {
             </Alert>
           )}
 
-          {/* Analiz sonucu gösterimi */}
-          {analysis?.distortions?.length > 0 && (
-            <Box
-              border="1px solid"
-              borderColor="gray.300"
-              borderRadius="md"
-              p={4}
-              mb={4}
-              bg="gray.50"
-            >
-              <Heading size="sm" mb={3}>AI Analizi – Bilişsel Çarpıtmalar</Heading>
-              <VStack spacing={4} align="stretch">
-                {analysis.distortions.map((d, i) => (
-                  <Box
-                    key={i}
-                    p={3}
-                    border="1px solid"
-                    borderColor="gray.200"
-                    borderRadius="md"
-                    bg="white"
-                  >
-                    <Text fontSize="sm"><strong>Tür:</strong> {d.type}</Text>
-                    <Text fontSize="sm"><strong>İfade:</strong> {d.sentence}</Text>
-                    <Text fontSize="sm"><strong>Açıklama:</strong> {d.explanation}</Text>
-                    <Text fontSize="sm"><strong>Alternatif:</strong> {d.alternative}</Text>
-                  </Box>
-                ))}
-              </VStack>
-            </Box>
-          )}
+                     {/* Analiz sonucu ve kaydedilen giriş gösterimi */}
+           {(analysis?.distortions?.length > 0 || savedEntry) && (
+             <Box
+               border="1px solid"
+               borderColor="gray.300"
+               borderRadius="md"
+               p={4}
+               mb={4}
+               bg="gray.50"
+             >
+               {/* AI Analizi */}
+               {analysis?.distortions?.length > 0 && (
+                 <Box mb={6}>
+                   <Heading size="sm" mb={3}>AI Analizi – Bilişsel Çarpıtmalar</Heading>
+                   <VStack spacing={4} align="stretch">
+                     {analysis.distortions.map((d, i) => (
+                       <Box
+                         key={i}
+                         p={3}
+                         border="1px solid"
+                         borderColor="gray.200"
+                         borderRadius="md"
+                         bg="white"
+                       >
+                         <Text fontSize="sm"><strong>Tür:</strong> {d.type}</Text>
+                         <Text fontSize="sm"><strong>İfade:</strong> {d.sentence}</Text>
+                         <Text fontSize="sm"><strong>Açıklama:</strong> {d.explanation}</Text>
+                         <Text fontSize="sm"><strong>Alternatif:</strong> {d.alternative}</Text>
+                       </Box>
+                     ))}
+                   </VStack>
+                 </Box>
+               )}
+               
+               {/* Kaydedilen Giriş */}
+               {savedEntry && (
+                 <Box>
+                   <Heading size="sm" mb={3}>Kaydedilen Giriş</Heading>
+                   <Box
+                     p={4}
+                     border="1px solid"
+                     borderColor="gray.200"
+                     borderRadius="md"
+                     bg="white"
+                   >
+                     <HStack spacing={3} mb={3}>
+                       <Badge colorScheme="green" variant="subtle">
+                         {new Date(savedEntry.created_at).toLocaleString('tr-TR')}
+                       </Badge>
+                       {moodOptions.find(opt => opt.value === savedEntry.mood_score) && (
+                         <Box 
+                           color={moodOptions.find(opt => opt.value === savedEntry.mood_score).color} 
+                           fontSize="xl"
+                         >
+                           {moodOptions.find(opt => opt.value === savedEntry.mood_score).icon}
+                         </Box>
+                       )}
+                     </HStack>
+                     <Text fontSize="md" lineHeight="tall" color="gray.700">
+                       {savedEntry.text}
+                     </Text>
+                   </Box>
+                 </Box>
+               )}
+             </Box>
+           )}
 
 
           <form onSubmit={handleSubmit}>
             <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>Duygu Durumu</FormLabel>
-                <HStack spacing={3} justify="center">
-                  {moodOptions.map((opt) => (
-                    <Button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setMood(opt.value)}
-                      variant={mood === opt.value ? "solid" : "ghost"}
-                      colorScheme={mood === opt.value ? "yellow" : "gray"}
-                      size="lg"
-                      fontSize="2xl"
-                      borderWidth={mood === opt.value ? 2 : 1}
-                      borderColor={mood === opt.value ? opt.color : "gray.200"}
-                      boxShadow={mood === opt.value ? "md" : "none"}
-                      aria-label={opt.label}
-                    >
-                      {opt.icon}
-                    </Button>
-                  ))}
-                </HStack>
-              </FormControl>
-              <FormControl isRequired>
-                <FormLabel>Bugün neler yaşadınız?</FormLabel>
-                <Textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Düşüncelerinizi, duygularınızı, yaşadıklarınızı buraya yazın..."
-                  size="lg"
-                  minH="300px"
-                  resize="vertical"
-                  disabled={isLoading}
-                />
-              </FormControl>
+                             <FormControl isRequired>
+                 <FormLabel htmlFor="mood">Duygu Durumu</FormLabel>
+                 <HStack spacing={3} justify="center" id="mood">
+                   {moodOptions.map((opt) => (
+                     <Button
+                       key={opt.value}
+                       type="button"
+                       onClick={() => setMood(opt.value)}
+                       variant={mood === opt.value ? "solid" : "ghost"}
+                       colorScheme={mood === opt.value ? "yellow" : "gray"}
+                       size="lg"
+                       fontSize="2xl"
+                       borderWidth={mood === opt.value ? 2 : 1}
+                       borderColor={mood === opt.value ? opt.color : "gray.200"}
+                       boxShadow={mood === opt.value ? "md" : "none"}
+                       aria-label={opt.label}
+                     >
+                       {opt.icon}
+                     </Button>
+                   ))}
+                 </HStack>
+               </FormControl>
+               <FormControl isRequired>
+                 <FormLabel htmlFor="content">Bugün neler yaşadınız?</FormLabel>
+                 <Textarea
+                   id="content"
+                   value={content}
+                   onChange={(e) => setContent(e.target.value)}
+                   placeholder="Düşüncelerinizi, duygularınızı, yaşadıklarınızı buraya yazın..."
+                   size="lg"
+                   minH="300px"
+                   resize="vertical"
+                   disabled={isLoading}
+                 />
+               </FormControl>
 
-              <Button
-                type="submit"
-                colorScheme="brand"
-                size="lg"
-                w="full"
-                isLoading={isLoading}
-                loadingText="Kaydediliyor..."
-              >
-                Kaydet
-              </Button>
+                             <Button
+                 type="submit"
+                 colorScheme="brand"
+                 size="lg"
+                 w="full"
+                 isLoading={isLoading}
+                 loadingText="Kaydediliyor..."
+               >
+                 Kaydet
+               </Button>
+               
+               {/* Yeni giriş yapmak için buton */}
+               {savedEntry && (
+                 <Button
+                   type="button"
+                   colorScheme="blue"
+                   size="lg"
+                   w="full"
+                   onClick={() => {
+                     setContent("");
+                     setMood(null);
+                     setSavedEntry(null);
+                     setAnalysis("");
+                     setSuccess("");
+                     setError("");
+                   }}
+                 >
+                   Yeni Giriş Yap
+                 </Button>
+               )}
             </VStack>
           </form>
         </Box>

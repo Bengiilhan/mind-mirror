@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import timedelta
 import os
+import json
 from dotenv import load_dotenv
 from typing import Optional
 from datetime import datetime
@@ -27,8 +28,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*", "Authorization", "Content-Type"],
+    expose_headers=["*"],
 )
 
 # Authentication endpoints
@@ -101,13 +103,32 @@ def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_us
         )
         db.add(db_analysis)
         db.commit()
+        db.refresh(db_analysis)
     except Exception as e:
         print("Analiz başarısız:", e)
 
-    return db_entry
+    # EntryResponse formatında döndür
+    analysis_data = None
+    if hasattr(db_entry, 'analysis') and db_entry.analysis and db_entry.analysis.result:
+        raw = db_entry.analysis.result
+        if isinstance(raw, str):
+            try:
+                analysis_data = json.loads(raw)
+            except json.JSONDecodeError:
+                analysis_data = None
+        elif isinstance(raw, dict):
+            analysis_data = raw
 
+    entry_dict = {
+        "id": db_entry.id,
+        "text": db_entry.text,
+        "mood_score": db_entry.mood_score,
+        "created_at": db_entry.created_at,
+        "user_id": db_entry.user_id,
+        "analysis": analysis_data
+    }
 
-import json  # başta ekle
+    return EntryResponse(**entry_dict)
 
 @app.get("/entries/", response_model=List[EntryResponse])
 def get_entries(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -146,24 +167,47 @@ def get_entries(current_user: User = Depends(get_current_user), db: Session = De
         }
 
         result.append(EntryResponse(**entry_dict))
-        return result
+    
+    return result
 
 
 
-    @app.put("/entries/{entry_id}", response_model=EntryResponse)
-    def update_entry(entry_id: int, entry_update: EntryUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-        db_entry = db.query(Entry).filter(Entry.id == entry_id, Entry.user_id == current_user.id).first()
-        if not db_entry:
-            raise HTTPException(status_code=404, detail="Entry not found")
-        
-        if entry_update.text is not None:
-            db_entry.text = entry_update.text
-        if entry_update.mood_score is not None:
-            db_entry.mood_score = entry_update.mood_score
-        
-        db.commit()
-        db.refresh(db_entry)
-        return db_entry
+@app.put("/entries/{entry_id}", response_model=EntryResponse)
+def update_entry(entry_id: int, entry_update: EntryUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_entry = db.query(Entry).filter(Entry.id == entry_id, Entry.user_id == current_user.id).first()
+    if not db_entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    
+    if entry_update.text is not None:
+        db_entry.text = entry_update.text
+    if entry_update.mood_score is not None:
+        db_entry.mood_score = entry_update.mood_score
+    
+    db.commit()
+    db.refresh(db_entry)
+    
+    # EntryResponse formatında döndür
+    analysis_data = None
+    if hasattr(db_entry, 'analysis') and db_entry.analysis and db_entry.analysis.result:
+        raw = db_entry.analysis.result
+        if isinstance(raw, str):
+            try:
+                analysis_data = json.loads(raw)
+            except json.JSONDecodeError:
+                analysis_data = None
+        elif isinstance(raw, dict):
+            analysis_data = raw
+
+    entry_dict = {
+        "id": db_entry.id,
+        "text": db_entry.text,
+        "mood_score": db_entry.mood_score,
+        "created_at": db_entry.created_at,
+        "user_id": db_entry.user_id,
+        "analysis": analysis_data
+    }
+
+    return EntryResponse(**entry_dict)
 
 @app.delete("/entries/{entry_id}")
 def delete_entry(entry_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

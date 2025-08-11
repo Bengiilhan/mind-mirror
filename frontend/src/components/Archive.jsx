@@ -78,7 +78,7 @@ export default function Archive() {
   const fetchEntries = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:8000/entries", {
+      const res = await fetch("http://localhost:8000/entries/", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -111,7 +111,7 @@ export default function Archive() {
     // Arama filtresi
     if (searchTerm) {
       filtered = filtered.filter(entry =>
-        entry.content.toLowerCase().includes(searchTerm.toLowerCase())
+        entry.text.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 

@@ -141,8 +141,9 @@ export default function RegisterForm() {
           <form onSubmit={handleSubmit}>
             <VStack spacing={4}>
               <FormControl isRequired>
-                <FormLabel>Ad Soyad</FormLabel>
+                <FormLabel htmlFor="name">Ad Soyad</FormLabel>
                 <Input
+                  id="name"
                   name="name"
                   type="text"
                   value={formData.name}
@@ -154,8 +155,9 @@ export default function RegisterForm() {
               </FormControl>
 
               <FormControl isRequired>
-                <FormLabel>E-posta</FormLabel>
+                <FormLabel htmlFor="email">E-posta</FormLabel>
                 <Input
+                  id="email"
                   name="email"
                   type="email"
                   value={formData.email}
@@ -167,9 +169,10 @@ export default function RegisterForm() {
               </FormControl>
 
               <FormControl isRequired>
-                <FormLabel>Şifre</FormLabel>
+                <FormLabel htmlFor="password">Şifre</FormLabel>
                 <InputGroup size="lg">
                   <Input
+                    id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -36,11 +36,7 @@ export default function Home() {
   const cardBg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  useEffect(() => {
-    fetchEntries();
-  }, []);
-
-  const fetchEntries = async () => {
+  const fetchEntries = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch("http://localhost:8000/entries/", {
@@ -71,7 +67,11 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [logout, navigate]);
+
+  useEffect(() => {
+    fetchEntries();
+  }, [fetchEntries]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
