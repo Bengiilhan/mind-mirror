@@ -12,7 +12,7 @@ from database import engine, get_db
 from models import Base, User, Entry, Analysis
 from schemas import UserCreate, UserLogin, UserResponse, Token, EntryCreate, EntryUpdate, EntryResponse
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
-from analyze import router as analyze_router, analyze_entry
+from agents.analyze import router as analyze_router
 from typing import List
 
 # Load environment variables
@@ -26,7 +26,7 @@ app = FastAPI(title="Zihin Aynası API", version="1.0.0")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*", "Authorization", "Content-Type"],
@@ -94,18 +94,56 @@ def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_us
     db.commit()
     db.refresh(db_entry)
 
-    # ✅ Analiz sonucunu al ve Analysis tablosuna kaydet
+    # ✅ Agent ile analiz yap ve Analysis tablosuna kaydet
+    analysis_data = None
     try:
-        analysis_result = analyze_entry(entry.text)
-        db_analysis = Analysis(
-            entry_id=db_entry.id,
-            result=analysis_result 
-        )
-        db.add(db_analysis)
-        db.commit()
-        db.refresh(db_analysis)
+        # Agent analizi için istek at
+        from agents.cognitive_agent import CognitiveAnalysisAgent
+        
+        # Agent instance oluştur
+        cognitive_agent = CognitiveAnalysisAgent()
+        
+        # Gerçek agent analizi yap
+        import asyncio
+        
+        # Async analiz için event loop oluştur
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            analysis_result = loop.run_until_complete(
+                cognitive_agent.analyze_entry(
+                    text=entry.text,
+                    user_id=str(current_user.id)
+                )
+            )
+            
+            # Analysis tablosuna kaydet
+            db_analysis = Analysis(
+                entry_id=db_entry.id,
+                result=analysis_result
+            )
+            db.add(db_analysis)
+            db.commit()
+            db.refresh(db_analysis)
+            
+            # Analiz verisini hazırla
+            analysis_data = analysis_result
+            
+            print(f"✅ Gerçek agent analizi başarılı: {len(analysis_result.get('distortions', []))} çarpıtma tespit edildi")
+            
+        finally:
+            loop.close()
+        
     except Exception as e:
-        print("Analiz başarısız:", e)
+        print(f"❌ Analiz hatası: {e}")
+        # Hata durumunda basit bir analiz oluştur
+        analysis_data = {
+            "distortions": [],
+            "overall_mood": "belirsiz",
+            "error": "Analiz yapılamadı",
+            "analysis_timestamp": datetime.now().isoformat()
+        }
 
     # EntryResponse formatında döndür
     analysis_data = None
