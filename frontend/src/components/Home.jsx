@@ -119,7 +119,7 @@ export default function Home() {
               bgGradient="linear(to-r, brand.500, purple.500)"
               bgClip="text"
             >
-              Zihin Aynası
+              Mind Mirror
             </Heading>
             <Text fontSize="lg" color="gray.600">
               Düşüncelerinizi kaydedin, analiz edin ve gelişin

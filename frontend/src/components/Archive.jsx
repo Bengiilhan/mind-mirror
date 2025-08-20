@@ -199,6 +199,10 @@ export default function Archive() {
 
       if (res.ok) {
         setEntries(entries.filter(entry => entry.id !== entryId));
+        if (selectedEntry?.id === entryId) {
+          onClose();
+          setSelectedEntry(null);
+        }
       } else {
         throw new Error("Giriş silinemedi");
       }

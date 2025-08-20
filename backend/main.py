@@ -253,6 +253,16 @@ def delete_entry(entry_id: int, current_user: User = Depends(get_current_user), 
     if not db_entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     
+    # İlişkili analiz kaydı varsa önce onu sil
+    try:
+        analysis_obj = db.query(Analysis).filter(Analysis.entry_id == db_entry.id).first()
+        if analysis_obj:
+            db.delete(analysis_obj)
+            db.flush()
+    except Exception:
+        # Analiz silme denemesi başarısız olsa bile giriş silme işlemini engelleme
+        pass
+
     db.delete(db_entry)
     db.commit()
     return {"message": "Entry deleted successfully"}
