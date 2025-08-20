@@ -91,42 +91,9 @@ export default function NewEntry() {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
-      // 1. Girişi kaydet
-      const res = await fetch("http://localhost:8000/entries/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ text: content.trim(), mood_score: mood }),
-      });
-      if (res.status === 401) {
-        logout();
-        navigate("/login");
-        return;
-      }
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Giriş oluşturulamadı");
-      }
       
-      const savedData = await res.json();
-      setSavedEntry(savedData);
-      setSuccess("Günlük girişi başarıyla kaydedildi!");
-      
-      // 2. Yeni Agent API'sine istek at
-      console.log("🔍 Analyze request gönderiliyor...");
-      console.log("Request data:", { 
-        text: content.trim(),
-        user_id: savedData.user_id || "unknown"
-      });
-      
-      const requestBody = { 
-        text: content.trim(),
-        user_id: String(savedData.user_id || "unknown")
-      };
-      
-      console.log("📤 Sending analyze request:", requestBody);
+      // 1. ÖNCE ANALİZ YAP
+      console.log("🔍 Analiz başlatılıyor...");
       
       const analyzeRes = await fetch("http://localhost:8000/analyze/", {
         method: "POST",
@@ -134,27 +101,52 @@ export default function NewEntry() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({ 
+          text: content.trim(),
+          user_id: "temp" // Geçici ID
+        }),
       });
-      
-      console.log("📊 Analyze response status:", analyzeRes.status);
-      console.log("📊 Analyze response headers:", Object.fromEntries(analyzeRes.headers.entries()));
       
       if (analyzeRes.ok) {
         const analyzeData = await analyzeRes.json();
         setAnalysis(analyzeData);
         console.log("✅ Analiz başarılı:", analyzeData);
-      } else {
-        console.error("❌ Error status:", analyzeRes.status);
-        console.error("❌ Error headers:", Object.fromEntries(analyzeRes.headers.entries()));
         
+        // 2. ANALİZ BAŞARILIYSA GÜNLÜK KAYDET
+        const res = await fetch("http://localhost:8000/entries/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ 
+            text: content.trim(), 
+            mood_score: mood,
+            analysis: analyzeData // Analiz sonucunu da gönder
+          }),
+        });
+        
+        if (res.status === 401) {
+          logout();
+          navigate("/login");
+          return;
+        }
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.detail || "Giriş oluşturulamadı");
+        }
+        
+        const savedData = await res.json();
+        setSavedEntry(savedData);
+        setSuccess("Günlük girişi başarıyla kaydedildi ve analiz edildi!");
+        
+      } else {
+        console.error("❌ Analiz hatası:", analyzeRes.status);
         let errorData;
         try {
           errorData = await analyzeRes.json();
-          console.error("❌ Analiz hatası (JSON):", errorData);
         } catch (jsonError) {
           const errorText = await analyzeRes.text();
-          console.error("❌ Analiz hatası (text):", errorText);
           errorData = { detail: errorText };
         }
         
@@ -162,6 +154,22 @@ export default function NewEntry() {
           error: "Analiz alınamadı",
           details: errorData.detail || "Bilinmeyen hata"
         });
+        
+        // Analiz başarısızsa sadece günlük kaydet
+        const res = await fetch("http://localhost:8000/entries/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ text: content.trim(), mood_score: mood }),
+        });
+        
+        if (res.ok) {
+          const savedData = await res.json();
+          setSavedEntry(savedData);
+          setSuccess("Günlük girişi kaydedildi (analiz başarısız)");
+        }
       }
       
     } catch (err) {

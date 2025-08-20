@@ -94,68 +94,52 @@ def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_us
     db.commit()
     db.refresh(db_entry)
 
-    # ✅ Agent ile analiz yap ve Analysis tablosuna kaydet
+    # Eğer analiz sonucu gönderilmişse onu kullan, yoksa yeni analiz yap
     analysis_data = None
-    try:
-        # Agent analizi için istek at
-        from agents.cognitive_agent import CognitiveAnalysisAgent
-        
-        # Agent instance oluştur
-        cognitive_agent = CognitiveAnalysisAgent()
-        
-        # Gerçek agent analizi yap
-        import asyncio
-        
-        # Async analiz için event loop oluştur
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
+    
+    # Frontend'den gelen analiz sonucunu kontrol et
+    if hasattr(entry, 'analysis') and entry.analysis:
+        analysis_data = entry.analysis
+        print("✅ Frontend'den gelen analiz sonucu kullanılıyor")
+    else:
+        # Yeni analiz yap
         try:
-            analysis_result = loop.run_until_complete(
-                cognitive_agent.analyze_entry(
-                    text=entry.text,
-                    user_id=str(current_user.id)
-                )
-            )
+            from agents.cognitive_agent import CognitiveAnalysisAgent
+            cognitive_agent = CognitiveAnalysisAgent()
+            import asyncio
             
-            # Analysis tablosuna kaydet
-            db_analysis = Analysis(
-                entry_id=db_entry.id,
-                result=analysis_result
-            )
-            db.add(db_analysis)
-            db.commit()
-            db.refresh(db_analysis)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             
-            # Analiz verisini hazırla
-            analysis_data = analysis_result
-            
-            print(f"✅ Gerçek agent analizi başarılı: {len(analysis_result.get('distortions', []))} çarpıtma tespit edildi")
-            
-        finally:
-            loop.close()
-        
-    except Exception as e:
-        print(f"❌ Analiz hatası: {e}")
-        # Hata durumunda basit bir analiz oluştur
-        analysis_data = {
-            "distortions": [],
-            "overall_mood": "belirsiz",
-            "error": "Analiz yapılamadı",
-            "analysis_timestamp": datetime.now().isoformat()
-        }
-
-    # EntryResponse formatında döndür
-    analysis_data = None
-    if hasattr(db_entry, 'analysis') and db_entry.analysis and db_entry.analysis.result:
-        raw = db_entry.analysis.result
-        if isinstance(raw, str):
             try:
-                analysis_data = json.loads(raw)
-            except json.JSONDecodeError:
-                analysis_data = None
-        elif isinstance(raw, dict):
-            analysis_data = raw
+                analysis_result = loop.run_until_complete(
+                    cognitive_agent.analyze_entry(
+                        text=entry.text,
+                        user_id=str(current_user.id)
+                    )
+                )
+                analysis_data = analysis_result
+                print(f"✅ Yeni analiz yapıldı: {len(analysis_result.get('distortions', []))} çarpıtma")
+            finally:
+                loop.close()
+        except Exception as e:
+            print(f"❌ Analiz hatası: {e}")
+            analysis_data = {
+                "distortions": [],
+                "overall_mood": "belirsiz",
+                "error": "Analiz yapılamadı",
+                "analysis_timestamp": datetime.now().isoformat()
+            }
+
+    # Analysis tablosuna kaydet
+    if analysis_data:
+        db_analysis = Analysis(
+            entry_id=db_entry.id,
+            result=analysis_data
+        )
+        db.add(db_analysis)
+        db.commit()
+        db.refresh(db_analysis)
 
     entry_dict = {
         "id": db_entry.id,

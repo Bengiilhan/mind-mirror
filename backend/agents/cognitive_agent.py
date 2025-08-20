@@ -47,64 +47,51 @@ class CognitiveAnalysisAgent:
     
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-4",
-            temperature=0.3,
-            api_key=os.getenv("OPENAI_API_KEY")
+            model="gpt-3.5-turbo-0125",  # En güncel ve güvenilir model
+            temperature=0.1,  # Daha düşük temperature = daha hızlı
+            api_key=os.getenv("OPENAI_API_KEY"),
+            max_tokens=1500,  # Biraz daha token
+            request_timeout=30  # Biraz daha uzun timeout
         )
         
         # Çıktı parser
         self.output_parser = JsonOutputParser(pydantic_object=AnalysisResult)
         
-        # Sistem prompt'u
-        self.system_prompt = """Sen bir bilişsel davranışçı terapi (BDT) uzmanısın. 
-        Kullanıcının günlük yazılarını analiz ederek bilişsel çarpıtmaları tespit etmek 
-        ve alternatif düşünceler önermekle görevlisin.
+        # Sistem prompt'u - optimize edilmiş
+        self.system_prompt = """BDT uzmanı olarak günlük yazısını analiz et. Bilişsel çarpıtmaları tespit et.
 
-        Bilişsel çarpıtma türleri:
-        - Felaketleştirme: En kötü senaryoları varsayma
-        - Zihin okuma: Başkalarının düşüncelerini bildiğini varsayma
-        - Genelleme: Tek olaydan genel sonuçlar çıkarma
-        - Kişiselleştirme: Her şeyi kendine mal etme
-        - Etiketleme: Kendini veya başkalarını etiketleme
-        - Ya hep ya hiç: Siyah-beyaz düşünme
-        - Büyütme/küçültme: Olumsuzları abartma, olumluları küçümseme
-        - Kehanetçilik: Geleceği olumsuz tahmin etme
-        - Keyfi çıkarsama: Kanıtsız sonuçlara varma
-        - -meli/-malı düşünceleri: Katı kurallar koyma
+        Çarpıtma türleri: Felaketleştirme, Zihin okuma, Genelleme, Kişiselleştirme, Etiketleme, Ya hep ya hiç, Büyütme/küçültme, Kehanetçilik, Keyfi çıkarsama, -meli/-malı düşünceleri.
 
-        Analiz yaparken:
+                Analiz yaparken:
         1. Metni dikkatlice oku ve olumsuz düşünceleri tespit et
         2. Her çarpıtma için türünü belirle
         3. Şiddet seviyesini değerlendir
         4. Güvenilir alternatif düşünceler öner
         5. Genel ruh hali ve risk seviyesini değerlendir
-        6. Yapıcı ve destekleyici bir ton kullan
+        6. Yapıcı ve destekleyici bir ton kullan.
 
-        ÖNEMLİ: Eğer intihar düşüncesi veya ciddi kriz belirtileri tespit edersen,
-        mutlaka profesyonel yardım öner ve risk seviyesini "yüksek" olarak işaretle.
-
-                 YANIT FORMATI: Yanıtını kesinlikle aşağıdaki JSON formatında ver, başka hiçbir şey ekleme:
-         {{
-             "distortions": [
-                 {{
-                     "type": "çarpıtma_türü",
-                     "sentence": "ilgili_cümle",
-                     "explanation": "açıklama",
-                     "alternative": "alternatif_düşünce",
-                     "severity": "düşük/orta/yüksek",
-                     "confidence": 0.8
-                 }}
-             ],
-             "overall_mood": "genel_ruh_hali",
-             "risk_level": "düşük/orta/yüksek",
-             "recommendations": ["öneri1", "öneri2"]
-         }}
+        JSON formatında yanıt ver:
+        {{
+            "distortions": [
+                {{
+                    "type": "çarpıtma_türü",
+                    "sentence": "ilgili_cümle",
+                    "explanation": "Bu düşünce şu nedenle bir çarpıtmadır...",
+                    "alternative": "alternatif_düşünce",
+                    "severity": "düşük/orta/yüksek",
+                    "confidence": 0.8
+                }}
+            ],
+            "overall_mood": "genel_ruh_hali",
+            "risk_level": "düşük/orta/yüksek",
+            "recommendations": ["öneri1", "öneri2"]
+        }}
         """
         
-        # Ana analiz prompt'u - chat_history olmadan basit versiyon
+        # Ana analiz prompt'u - ultra optimize edilmiş
         self.analysis_prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
-            ("human", "Lütfen aşağıdaki günlük yazısını analiz et:\n\n{text}")
+            ("human", "Analiz et:\n{text}")
         ])
         
         # Memory sistemi
@@ -123,43 +110,22 @@ class CognitiveAnalysisAgent:
     async def analyze_entry(self, text: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Günlük yazısını analiz eder"""
         try:
-            logger.info(f"Analiz başlatılıyor - Kullanıcı: {user_id}")
-            
-            # Risk değerlendirmesi
-            risk_level = await self._assess_risk_async(text)
-            
-            # Ana analiz
+            # Ana analiz - risk değerlendirmesi ve öneriler dahil
             analysis_result = await self._analyze_text_async(text)
-            
-            # Debug: analysis_result tipini kontrol et
-            logger.info(f"Analysis result type: {type(analysis_result)}")
-            logger.info(f"Analysis result: {analysis_result}")
-            
-            # Öneriler üret
-            if isinstance(analysis_result, dict):
-                suggestions = await self._generate_suggestions_async(analysis_result.get("distortions", []))
-            else:
-                logger.error(f"Analysis result is not dict: {type(analysis_result)}")
-                # Eğer dict değilse, fallback analiz kullan
-                analysis_result = await self._fallback_analysis(text)
-                suggestions = await self._generate_suggestions_async(analysis_result.get("distortions", []))
             
             # Sonuçları birleştir
             final_result = {
                 **analysis_result,
-                "risk_level": risk_level,
-                "recommendations": suggestions,
                 "analysis_timestamp": datetime.now().isoformat(),
                 "user_id": user_id
             }
             
-            # Memory'ye kaydet
-            self.memory.save_context(
-                {"input": f"Analiz: {text[:100]}..."},
-                {"output": json.dumps(final_result, ensure_ascii=False)}
-            )
+            # Memory'ye kaydet (opsiyonel - hız için kaldırılabilir)
+            # self.memory.save_context(
+            #     {"input": f"Analiz: {text[:100]}..."},
+            #     {"output": json.dumps(final_result, ensure_ascii=False)}
+            # )
             
-            logger.info(f"Analiz tamamlandı - {len(analysis_result.get('distortions', []))} çarpıtma tespit edildi")
             return final_result
             
         except Exception as e:
@@ -173,65 +139,90 @@ class CognitiveAnalysisAgent:
                 "analysis_timestamp": datetime.now().isoformat()
             }
     
-    async def _assess_risk_async(self, text: str) -> str:
-        """Risk değerlendirmesi yapar"""
-        try:
-            risk_prompt = f"""
-            Aşağıdaki metni oku ve risk seviyesini değerlendir:
-            - Düşük risk: Normal günlük yazısı
-            - Orta risk: Depresif veya kaygılı düşünceler
-            - Yüksek risk: İntihar düşüncesi, ciddi kriz belirtileri
-            
-            Metin: {text}
-            
-            Sadece risk seviyesini döndür: "düşük", "orta" veya "yüksek"
-            """
-            
-            response = await self.llm.ainvoke(risk_prompt)
-            return response.content.strip().lower()
-        except:
-            return "belirsiz"
+    # Risk değerlendirmesi artık ana analiz içinde yapılıyor
+    # async def _assess_risk_async(self, text: str) -> str:
+    #     """Risk değerlendirmesi yapar"""
+    #     try:
+    #         risk_prompt = f"""
+    #         Aşağıdaki metni oku ve risk seviyesini değerlendir:
+    #         - Düşük risk: Normal günlük yazısı
+    #         - Orta risk: Depresif veya kaygılı düşünceler
+    #         - Yüksek risk: İntihar düşüncesi, ciddi kriz belirtileri
+    #         
+    #         Metin: {text}
+    #         
+    #         Sadece risk seviyesini döndür: "düşük", "orta" veya "yüksek"
+    #         """
+    #         
+    #         response = await self.llm.ainvoke(risk_prompt)
+    #         return response.content.strip().lower()
+    #     except:
+    #         return "belirsiz"
     
     async def _analyze_text_async(self, text: str) -> Dict[str, Any]:
-        """Metni analiz eder"""
+        """Metni analiz eder - ultra optimize edilmiş"""
         try:
-            logger.info("🔍 LangChain chain ile analiz başlatılıyor...")
+            # Sistem prompt'u ile birlikte LLM çağrısı
+            full_prompt = f"""BDT uzmanı. Günlük yazısını analiz et. Çarpıtmaları tespit et.
+
+Çarpıtma türleri: Felaketleştirme, Zihin okuma, Genelleme, Kişiselleştirme, Etiketleme, Ya hep ya hiç, Büyütme/küçültme, Kehanetçilik, Keyfi çıkarsama, -meli/-malı düşünceleri.
+
+KURALLAR: Doğrudan kullanıcıya hitap et (sen, siz). İntihar düşüncesi varsa risk="yüksek" yap.
+
+Metin: {text}
+
+SADECE JSON formatında yanıt ver, başka hiçbir şey ekleme:
+{{
+    "distortions": [
+        {{
+            "type": "çarpıtma_türü",
+            "sentence": "ilgili_cümle",
+            "explanation": "Bu düşünce şu nedenle çarpıtmadır...",
+            "alternative": "alternatif_düşünce",
+            "severity": "düşük/orta/yüksek",
+            "confidence": 0.8
+        }}
+    ],
+    "overall_mood": "genel_ruh_hali",
+    "risk_level": "düşük/orta/yüksek",
+    "recommendations": ["öneri1", "öneri2"]
+}}"""
+
+            # LLM çağrısı
+            response = await self.llm.ainvoke(full_prompt)
             
-            # Önce prompt'u test edelim
-            prompt_result = await self.analysis_prompt.ainvoke({"text": text})
-            logger.info(f"📝 Prompt sonucu: {prompt_result}")
-            
-            # LLM'i test edelim
-            llm_result = await self.llm.ainvoke(prompt_result)
-            logger.info(f"🤖 LLM yanıtı: {llm_result.content}")
-            
-            # Output parser'ı test edelim
+            # JSON parse
             try:
-                parsed_result = await self.output_parser.ainvoke(llm_result.content)
-                logger.info(f"✅ Output parser sonucu: {parsed_result}")
-                
-                # Parsed result'ın dict olduğundan emin ol
-                if isinstance(parsed_result, dict):
-                    return parsed_result
-                else:
-                    logger.error(f"❌ Output parser dict döndürmedi: {type(parsed_result)}")
-                    # Fallback: Manuel JSON parse
-                    return await self._parse_llm_response_manually(llm_result.content)
-                    
-            except Exception as parse_error:
-                logger.error(f"❌ Output parser hatası: {parse_error}")
-                # Fallback: Manuel JSON parse
-                return await self._parse_llm_response_manually(llm_result.content)
+                return json.loads(response.content)
+            except:
+                # Fallback: JSON çıkar
+                json_data = self._extract_json_from_text(response.content)
+                return json.loads(json_data)
             
         except Exception as e:
-            logger.error(f"❌ LangChain analiz hatası: {e}")
-            logger.info("🔄 Fallback analiz kullanılıyor...")
-            # Fallback: Basit analiz
-            return await self._fallback_analysis(text)
+            logger.error(f"Analiz hatası: {e}")
+            logger.error(f"LLM yanıtı: {response.content if 'response' in locals() else 'Yanıt yok'}")
+            return {
+                "distortions": [
+                    {
+                        "type": "Genelleme",
+                        "sentence": text[:100] + "..." if len(text) > 100 else text,
+                        "explanation": "Metin analiz edilemedi, teknik bir hata oluştu",
+                        "alternative": "Daha sonra tekrar deneyin",
+                        "severity": "düşük",
+                        "confidence": 0.1
+                    }
+                ],
+                "overall_mood": "belirsiz",
+                "risk_level": "belirsiz",
+                "recommendations": ["Analiz sırasında teknik bir hata oluştu. Lütfen daha sonra tekrar deneyin."]
+            }
     
     def _extract_json_from_text(self, text: str) -> str:
-        """Metinden JSON çıkarır"""
+        """Metinden JSON çıkarır - geliştirilmiş"""
         try:
+            logger.info(f"JSON çıkarma başlatılıyor. Metin: {text[:200]}...")
+            
             # İlk deneme: Basit JSON arama
             json_start = text.find("{")
             json_end = text.rfind("}") + 1
@@ -240,6 +231,7 @@ class CognitiveAnalysisAgent:
                 json_data = text[json_start:json_end].strip()
                 # JSON geçerliliğini test et
                 json.loads(json_data)
+                logger.info(f"JSON bulundu (basit arama): {json_data[:100]}...")
                 return json_data
             
             # İkinci deneme: Temizleme
@@ -251,16 +243,17 @@ class CognitiveAnalysisAgent:
                 json_data = cleaned_text[json_start:json_end].strip()
                 # JSON geçerliliğini test et
                 json.loads(json_data)
+                logger.info(f"JSON bulundu (temizleme sonrası): {json_data[:100]}...")
                 return json_data
             
-            # Üçüncü deneme: Daha agresif temizleme
-            # Markdown code blocks'ları kaldır
+            # Üçüncü deneme: Markdown code blocks
             if "```json" in text:
                 start_marker = text.find("```json") + 7
                 end_marker = text.find("```", start_marker)
                 if end_marker != -1:
                     json_data = text[start_marker:end_marker].strip()
                     json.loads(json_data)  # Test
+                    logger.info(f"JSON bulundu (markdown json): {json_data[:100]}...")
                     return json_data
             
             if "```" in text:
@@ -269,8 +262,22 @@ class CognitiveAnalysisAgent:
                 if end_marker != -1:
                     json_data = text[start_marker:end_marker].strip()
                     json.loads(json_data)  # Test
+                    logger.info(f"JSON bulundu (markdown): {json_data[:100]}...")
                     return json_data
             
+            # Dördüncü deneme: Satır satır arama
+            lines = text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('{') and line.endswith('}'):
+                    try:
+                        json.loads(line)
+                        logger.info(f"JSON bulundu (satır arama): {line[:100]}...")
+                        return line
+                    except:
+                        continue
+            
+            logger.error(f"Hiçbir JSON bulunamadı. Tam metin: {text}")
             raise ValueError("Geçerli JSON bulunamadı")
             
         except Exception as e:
@@ -280,20 +287,15 @@ class CognitiveAnalysisAgent:
     async def _parse_llm_response_manually(self, content: str) -> Dict[str, Any]:
         """LLM yanıtını manuel olarak parse eder"""
         try:
-            logger.info("🔧 Manuel JSON parse başlatılıyor...")
-            logger.info(f"📝 Parse edilecek içerik: {content}")
-            
             # JSON çıkar
             json_data = self._extract_json_from_text(content)
-            logger.info(f"📋 Bulunan JSON: {json_data}")
             
             # Parse et
             parsed_result = json.loads(json_data)
-            logger.info(f"✅ Manuel parse başarılı: {parsed_result}")
             return parsed_result
                 
         except Exception as e:
-            logger.error(f"❌ Manuel parse hatası: {e}")
+            logger.error(f"Manuel parse hatası: {e}")
             # En son çare: Sabit format
             return {
                 "distortions": [
@@ -311,63 +313,7 @@ class CognitiveAnalysisAgent:
                 "recommendations": ["Analiz sırasında teknik bir hata oluştu. Lütfen daha sonra tekrar deneyin."]
             }
     
-    async def _fallback_analysis(self, text: str) -> Dict[str, Any]:
-        """Fallback analiz - LLM hatası durumunda"""
-        try:
-            logger.info("🔄 Fallback analiz başlatılıyor...")
-            
-            # Basit prompt ile analiz
-            simple_prompt = f"""
-            Aşağıdaki metni analiz et ve bilişsel çarpıtmaları tespit et:
-            
-            Metin: {text}
-            
-            Yanıtı kesinlikle şu JSON formatında ver, başka hiçbir şey ekleme:
-            {{
-                "distortions": [
-                    {{
-                        "type": "çarpıtma_türü",
-                        "sentence": "ilgili_cümle",
-                        "explanation": "açıklama",
-                        "alternative": "alternatif_düşünce",
-                        "severity": "düşük/orta/yüksek",
-                        "confidence": 0.7
-                    }}
-                ],
-                "overall_mood": "genel_ruh_hali",
-                "risk_level": "düşük/orta/yüksek",
-                "recommendations": ["öneri1", "öneri2"]
-            }}
-            """
-            
-            response = await self.llm.ainvoke(simple_prompt)
-            content = response.content.strip()
-            logger.info(f"📝 Fallback LLM yanıtı: {content}")
-            
-            # JSON çıkar
-            json_data = self._extract_json_from_text(content)
-            parsed_result = json.loads(json_data)
-            logger.info(f"✅ Fallback JSON parse başarılı: {parsed_result}")
-            return parsed_result
-                
-        except Exception as e:
-            logger.error(f"❌ Fallback analiz hatası: {e}")
-            # En son çare: Sabit format
-            return {
-                "distortions": [
-                    {
-                        "type": "Genelleme",
-                        "sentence": text[:100] + "..." if len(text) > 100 else text,
-                        "explanation": "Metin analiz edilemedi, genel bir değerlendirme yapıldı",
-                        "alternative": "Daha detaylı analiz için tekrar deneyin",
-                        "severity": "düşük",
-                        "confidence": 0.1
-                    }
-                ],
-                "overall_mood": "belirsiz",
-                "risk_level": "belirsiz",
-                "recommendations": ["Analiz sırasında teknik bir hata oluştu. Lütfen daha sonra tekrar deneyin."]
-            }
+    # Fallback analiz kaldırıldı - hız için
     
     async def _generate_suggestions_async(self, distortions: List[Dict]) -> List[str]:
         """Öneriler üretir"""

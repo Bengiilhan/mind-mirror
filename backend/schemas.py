@@ -29,6 +29,7 @@ class TokenData(BaseModel):
 class EntryCreate(BaseModel):
     text: str
     mood_score: Optional[int] = None
+    analysis: Optional[dict] = None  # Frontend'den gelen analiz sonucu
 
 class EntryUpdate(BaseModel):
     text: Optional[str] = None
