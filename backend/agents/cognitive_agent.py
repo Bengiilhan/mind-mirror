@@ -37,7 +37,6 @@ class CognitiveDistortion(BaseModel):
 class AnalysisResult(BaseModel):
     """Analiz sonucu modeli"""
     distortions: List[CognitiveDistortion] = Field(description="Tespit edilen bilişsel çarpıtmalar")
-    overall_mood: str = Field(description="Genel ruh hali değerlendirmesi")
     risk_level: str = Field(description="Risk seviyesi (düşük/orta/yüksek)")
     recommendations: Optional[List[str]] = Field(default=[], description="Genel öneriler")
     analysis_timestamp: Optional[str] = Field(default=None, description="Analiz zamanı")
@@ -62,12 +61,12 @@ class CognitiveAnalysisAgent:
 
         Çarpıtma türleri: Felaketleştirme, Zihin okuma, Genelleme, Kişiselleştirme, Etiketleme, Ya hep ya hiç, Büyütme/küçültme, Kehanetçilik, Keyfi çıkarsama, -meli/-malı düşünceleri.
 
-                Analiz yaparken:
+        Analiz yaparken:
         1. Metni dikkatlice oku ve olumsuz düşünceleri tespit et
         2. Her çarpıtma için türünü belirle
         3. Şiddet seviyesini değerlendir
         4. Güvenilir alternatif düşünceler öner
-        5. Genel ruh hali ve risk seviyesini değerlendir
+        5. Risk seviyesini değerlendir
         6. Yapıcı ve destekleyici bir ton kullan.
 
         JSON formatında yanıt ver:
@@ -82,7 +81,6 @@ class CognitiveAnalysisAgent:
                     "confidence": 0.8
                 }}
             ],
-            "overall_mood": "genel_ruh_hali",
             "risk_level": "düşük/orta/yüksek",
             "recommendations": ["öneri1", "öneri2"]
         }}
@@ -183,7 +181,6 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey ekleme:
             "confidence": 0.8
         }}
     ],
-    "overall_mood": "genel_ruh_hali",
     "risk_level": "düşük/orta/yüksek",
     "recommendations": ["öneri1", "öneri2"]
 }}"""
@@ -213,7 +210,6 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey ekleme:
                         "confidence": 0.1
                     }
                 ],
-                "overall_mood": "belirsiz",
                 "risk_level": "belirsiz",
                 "recommendations": ["Analiz sırasında teknik bir hata oluştu. Lütfen daha sonra tekrar deneyin."]
             }
@@ -308,7 +304,6 @@ SADECE JSON formatında yanıt ver, başka hiçbir şey ekleme:
                         "confidence": 0.1
                     }
                 ],
-                "overall_mood": "belirsiz",
                 "risk_level": "belirsiz",
                 "recommendations": ["Analiz sırasında teknik bir hata oluştu. Lütfen daha sonra tekrar deneyin."]
             }

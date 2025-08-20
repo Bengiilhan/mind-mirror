@@ -22,6 +22,7 @@ import {
 import { ArrowBackIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
 import { useAuth } from "../hooks/useAuth.jsx";
 import { FaRegSadTear, FaRegMeh, FaRegSmile, FaSmileBeam, FaRegFrown } from "react-icons/fa";
+import { useToast } from "@chakra-ui/react";
 
 export default function NewEntry() {
   const [content, setContent] = useState("");
@@ -34,6 +35,7 @@ export default function NewEntry() {
 
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const bg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
@@ -71,6 +73,32 @@ export default function NewEntry() {
         return <InfoIcon color="green.500" />;
       default:
         return <InfoIcon color="gray.500" />;
+    }
+  };
+
+  const checkStatisticsMilestone = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8000/statistics/should-generate", {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.should_generate) {
+          toast({
+            title: "🎉 Yeni İstatistikler Hazır!",
+            description: `${data.entry_count} giriş yaptınız. İstatistikler sayfasından ilerlemenizi görebilirsiniz.`,
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("İstatistik kontrol hatası:", err);
     }
   };
 
@@ -140,6 +168,9 @@ export default function NewEntry() {
         setSavedEntry(savedData);
         setSuccess("Günlük girişi başarıyla kaydedildi ve analiz edildi!");
         
+        // İstatistik kontrolü yap
+        checkStatisticsMilestone();
+        
       } else {
         console.error("❌ Analiz hatası:", analyzeRes.status);
         let errorData;
@@ -169,6 +200,9 @@ export default function NewEntry() {
           const savedData = await res.json();
           setSavedEntry(savedData);
           setSuccess("Günlük girişi kaydedildi (analiz başarısız)");
+          
+          // İstatistik kontrolü yap
+          checkStatisticsMilestone();
         }
       }
       

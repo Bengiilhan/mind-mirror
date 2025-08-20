@@ -257,3 +257,7 @@ def read_root():
     return {"message": "Zihin Aynası API is running"}
     
 app.include_router(analyze_router, prefix="/analyze", tags=["AI Analysis"])
+
+# İstatistik router'ını ekle
+from routers.statistics import router as statistics_router
+app.include_router(statistics_router, tags=["Statistics"])
