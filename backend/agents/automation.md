@@ -87,12 +87,14 @@ async def generate_weekly_report(user_id: str, week_start: datetime, entries_dat
    - Acil durum bildirimleri
    - Risk seviyesi yükseltilir
 
-**Risk Anahtar Kelimeleri:**
+**Risk Tespiti:**
 ```python
-HIGH_RISK_KEYWORDS = [
-    "intihar", "ölmek", "yaşamak istemiyorum", "bitirmek",
-    "kendimi öldürmek", "ölüm", "son", "bitiş"
-]
+# Yüksek risk durumunda otomatik kriz önerisi
+if (result.risk_level or "").lower() == "yüksek":
+    crisis_tip = (
+        "Kriz belirtileri tespit edildi. Lütfen en yakın acil hattı ile iletişime geçin ve "
+        "güvendiğiniz birine haber verin. Türkiye için 112 Acil."
+    )
 ```
 
 ## 4. Teknik Detaylar
@@ -108,11 +110,14 @@ pip install langchain langchain-openai langchain-community langchain-core
 ```python
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.pydantic_v1 import BaseModel, Field
 
-llm = ChatOpenAI(model="gpt-4", temperature=0.3)
-prompt = ChatPromptTemplate.from_messages([...])
-parser = JsonOutputParser()
+llm = ChatOpenAI(
+    model="gpt-4o-mini", 
+    temperature=0.0,
+    model_kwargs={"response_format": {"type": "json_object"}}
+)
+structured_llm = llm.with_structured_output(AnalysisResult)
 ```
 
 ### 4.2 Memory Sistemi
@@ -130,6 +135,10 @@ memory = ConversationBufferMemory(
     memory_key="chat_history",
     return_messages=True
 )
+
+# Memory yönetimi
+agent.get_memory_summary()  # Memory özetini al
+agent.clear_memory()        # Memory'yi temizle
 ```
 
 ### 4.3 Çıktı Formatları
@@ -137,22 +146,21 @@ memory = ConversationBufferMemory(
 **Bilişsel Çarpıtma Modeli:**
 ```python
 class CognitiveDistortion(BaseModel):
-    type: str                    # Çarpıtma türü
-    sentence: str                # İlgili cümle
-    explanation: str             # Açıklama
-    alternative: str             # Alternatif düşünce
-    severity: str                # Şiddet seviyesi
-    confidence: float            # Güvenilirlik (0-1)
+    type: str = Field(description="Çarpıtma türü (örn: felaketleştirme, zihin okuma, genelleme)")
+    sentence: str = Field(description="Çarpıtma içeren cümle")
+    explanation: str = Field(description="Neden bu çarpıtma olduğuna dair açıklama")
+    alternative: str = Field(description="Daha sağlıklı alternatif düşünce")
+    severity: Optional[str] = Field(default="orta", description="Çarpıtmanın şiddeti (düşük/orta/yüksek)")
+    confidence: Optional[float] = Field(default=0.7, description="Tespit güvenilirliği (0-1 arası)")
 ```
 
 **Analiz Sonucu:**
 ```python
 class AnalysisResult(BaseModel):
-    distortions: List[CognitiveDistortion]
-    overall_mood: str
-    risk_level: str
-    recommendations: List[str]
-    analysis_timestamp: str
+    distortions: List[CognitiveDistortion] = Field(default_factory=list, description="Tespit edilen bilişsel çarpıtmalar")
+    risk_level: str = Field(description="Risk seviyesi (düşük/orta/yüksek)")
+    recommendations: List[str] = Field(default_factory=list, description="Genel öneriler")
+    analysis_timestamp: Optional[str] = Field(default=None, description="Analiz zamanı")
 ```
 
 ## 5. Konfigürasyon
@@ -161,8 +169,8 @@ class AnalysisResult(BaseModel):
 
 ```bash
 OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4
-OPENAI_TEMPERATURE=0.3
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TEMPERATURE=0.0
 OPENAI_MAX_TOKENS=2000
 MAX_DISTORTIONS=5
 ANALYSIS_TIMEOUT=30

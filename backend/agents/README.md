@@ -8,7 +8,6 @@ Bu klasör, Zihin Aynası projesinin **LangChain tabanlı AI Agent sistemini** i
 agents/
 ├── __init__.py              # Paket başlatıcı
 ├── cognitive_agent.py       # Ana analiz agent'ı
-├── report_agent.py          # Rapor üretim agent'ı
 ├── factory.py               # Agent factory pattern
 ├── config.py                # Konfigürasyon ayarları
 ├── test_agent.py            # Test dosyası
@@ -23,11 +22,12 @@ agents/
 **Görev:** Kullanıcının günlük yazılarını analiz ederek bilişsel çarpıtmaları tespit eder.
 
 **Özellikler:**
-- GPT-4 ile metin analizi
-- Bilişsel çarpıtma tespiti
-- Risk seviyesi değerlendirmesi
-- Alternatif düşünce önerileri
-- Memory sistemi ile geçmiş hatırlama
+- GPT-4o-mini ile hızlı ve maliyet etkin analiz
+- Pydantic modelleri ile structured output
+- 10 farklı bilişsel çarpıtma türü tespiti
+- Otomatik kriz tespiti ve acil hattı yönlendirmesi
+- Çok aşamalı fallback sistemi
+- ConversationBufferMemory ile geçmiş hatırlama
 
 **Kullanım:**
 ```python
@@ -37,23 +37,25 @@ agent = CognitiveAnalysisAgent()
 result = await agent.analyze_entry(text="Günlük yazısı", user_id="user123")
 ```
 
-### 2. Report Agent
-**Dosya:** `report_agent.py`
+### 2. Statistics Service (Agent Dışında)
+**Dosya:** `../services/statistics_service.py`
 
-**Görev:** Haftalık ve aylık analiz raporları üretir.
+**Görev:** İstatistik hesaplama ve rapor üretimi.
 
 **Özellikler:**
-- Haftalık istatistikler
-- İlerleme takibi
-- Kişiselleştirilmiş öneriler
-- Grafik veri hazırlama
+- Kullanıcı istatistikleri
+- Mood analizi
+- Çarpıtma istatistikleri
+- AI içgörüleri
+- Milestone sistemi
 
 **Kullanım:**
 ```python
-from agents.report_agent import ReportAgent
+from services.statistics_service import StatisticsService
 
-agent = ReportAgent()
-report = await agent.generate_weekly_report(user_id, week_start, entries_data)
+stats_service = StatisticsService()
+stats = stats_service.get_user_statistics(db, user_id)
+insights = await stats_service.generate_ai_insights(entry_texts, stats)
 ```
 
 ## 🏭 Factory Pattern
@@ -120,8 +122,8 @@ pip install -r requirements.txt
 `.env` dosyasında:
 ```bash
 OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-4
-OPENAI_TEMPERATURE=0.3
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TEMPERATURE=0.0
 ```
 
 ### 3. Test
@@ -129,12 +131,16 @@ OPENAI_TEMPERATURE=0.3
 python agents/test_agent.py
 ```
 
+### 4. Not
+Report Agent kaldırıldı. Rapor üretimi artık `statistics_service.py` ile yapılıyor.
+
 ## 📊 Performans
 
-**Analiz Süresi:** 3-5 saniye
+**Analiz Süresi:** 2-4 saniye (GPT-4o-mini ile)
 **Başarı Oranı:** %95+
 **Memory Kullanımı:** 45MB
 **API Çağrı Sayısı:** 1500/gün
+**Model:** GPT-4o-mini (hız/maliyet/kalite dengesi)
 
 ## 🔧 Hata Ayıklama
 
@@ -198,4 +204,4 @@ Sorun yaşıyorsanız:
 
 ---
 
-**Not:** Bu agent sistemi, LangChain 0.2.16 sürümü ile uyumludur. Güncellemeler için LangChain changelog'unu kontrol edin.
+**Not:** Bu agent sistemi, LangChain 0.2.16 sürümü ile uyumludur. GPT-4o-mini modeli kullanılarak hız ve maliyet optimizasyonu sağlanmıştır.

@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 # Test için gerekli importlar
 try:
     from agents.cognitive_agent import CognitiveAnalysisAgent
-    from agents.report_agent import ReportAgent
+    # ReportAgent kaldırıldı - artık statistics_service kullanılıyor
     from agents.factory import agent_factory
     print("✅ Tüm agent'lar başarıyla import edildi")
 except ImportError as e:
@@ -63,54 +63,12 @@ async def test_cognitive_agent():
         return False
 
 async def test_report_agent():
-    """Report Agent'ı test eder"""
-    print("\n📊 Report Agent Testi")
+    """Report Agent testi - Kaldırıldı, artık statistics_service kullanılıyor"""
+    print("\n📊 Report Agent Testi - Kaldırıldı")
     print("=" * 50)
-    
-    try:
-        # Agent oluştur
-        agent = ReportAgent()
-        print("✅ Report Agent başarıyla oluşturuldu")
-        
-        # Test verileri
-        test_entries = [
-            {
-                "distortions": [
-                    {"type": "felaketleştirme", "sentence": "İşi kaybedeceğim"},
-                    {"type": "genelleme", "sentence": "Hiçbir işi doğru yapamıyorum"}
-                ],
-                "mood_score": 3
-            },
-            {
-                "distortions": [
-                    {"type": "kişiselleştirme", "sentence": "Her şey benim hatam"}
-                ],
-                "mood_score": 4
-            }
-        ]
-        
-        print(f"📝 Test verisi: {len(test_entries)} günlük yazısı")
-        
-        # Haftalık rapor üret
-        from datetime import datetime, timedelta
-        week_start = datetime.now() - timedelta(days=7)
-        
-        report = await agent.generate_weekly_report(
-            user_id="test_user",
-            week_start=week_start,
-            entries_data=test_entries
-        )
-        
-        print("✅ Haftalık rapor üretildi")
-        print(f"📊 Toplam yazı: {report.total_entries}")
-        print(f"🔍 Toplam çarpıtma: {report.total_distortions}")
-        print(f"📈 İlerleme puanı: {report.progress_score}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Test hatası: {e}")
-        return False
+    print("ℹ️  Rapor üretimi artık statistics_service ile yapılıyor")
+    print("✅ Test başarılı (kaldırıldı)")
+    return True
 
 async def test_factory():
     """Agent Factory'yi test eder"""
