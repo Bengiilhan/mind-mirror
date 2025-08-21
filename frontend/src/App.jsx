@@ -8,6 +8,7 @@ import Home from "./components/Home.jsx";
 import NewEntry from "./components/NewEntry.jsx";
 import Archive from "./components/Archive.jsx";
 import Statistics from "./components/Statistics.jsx";
+import TestRAG from "./components/TestRAG.jsx";
 
 // Dark Mode Toggle Component
 function DarkModeToggle() {
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/new-entry" element={isAuthenticated ? <NewEntry /> : <Navigate to="/login" />} />
           <Route path="/archive" element={isAuthenticated ? <Archive /> : <Navigate to="/login" />} />
           <Route path="/stats" element={isAuthenticated ? <Statistics /> : <Navigate to="/login" />} />
+          <Route path="/test-rag" element={isAuthenticated ? <TestRAG /> : <Navigate to="/login" />} />
           <Route path="*" element={<div>404 Not Found</div>} />
         </Routes>
       </Box>

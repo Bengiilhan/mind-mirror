@@ -23,6 +23,8 @@ import { ArrowBackIcon, WarningIcon, InfoIcon } from "@chakra-ui/icons";
 import { useAuth } from "../hooks/useAuth.jsx";
 import { FaRegSadTear, FaRegMeh, FaRegSmile, FaSmileBeam, FaRegFrown } from "react-icons/fa";
 import { useToast } from "@chakra-ui/react";
+import FeedbackCard from "./Entries/FeedbackCard";
+import TherapyTechniques from "./TherapyTechniques";
 
 export default function NewEntry() {
   const [content, setContent] = useState("");
@@ -32,6 +34,7 @@ export default function NewEntry() {
   const [success, setSuccess] = useState("");
   const [analysis, setAnalysis] = useState("");
   const [savedEntry, setSavedEntry] = useState(null);
+  const [ragTechniques, setRagTechniques] = useState({}); // RAG tekniklerini saklamak için
 
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -99,6 +102,60 @@ export default function NewEntry() {
       }
     } catch (err) {
       console.error("İstatistik kontrol hatası:", err);
+    }
+  };
+
+  // RAG tekniklerini kaydetme fonksiyonu
+  const saveRAGTechniques = async (distortionType, techniques) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("http://localhost:8000/rag/techniques/", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          distortion_type: distortionType,
+          user_context: content,
+          save_to_entry: true // Backend'e kaydetme işareti
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // RAG tekniklerini state'e kaydet
+        setRagTechniques(prev => ({
+          ...prev,
+          [distortionType]: data.data
+        }));
+        
+        // Analiz sonucuna RAG tekniklerini ekle
+        setAnalysis(prev => ({
+          ...prev,
+          rag_techniques: {
+            ...prev.rag_techniques,
+            [distortionType]: data.data
+          }
+        }));
+        
+        toast({
+          title: "💡 Teknikler Kaydedildi!",
+          description: `${distortionType} için terapi teknikleri arşive kaydedildi.`,
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (err) {
+      console.error("RAG teknikleri kaydetme hatası:", err);
+      toast({
+        title: "❌ Hata",
+        description: "Teknikler kaydedilemedi.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
     }
   };
 
@@ -261,7 +318,7 @@ export default function NewEntry() {
               mb={4}
               bg="gray.50"
             >
-              {/* AI Analizi */}
+              {/* AI Analizi - Detaylı + RAG */}
               {analysis?.distortions?.length > 0 && (
                 <Box mb={6}>
                   <Heading size="sm" mb={3}>🧠 AI Analizi – Bilişsel Çarpıtmalar</Heading>
@@ -284,7 +341,7 @@ export default function NewEntry() {
                     </Box>
                   )}
 
-                  {/* Bilişsel Çarpıtmalar */}
+                  {/* Bilişsel Çarpıtmalar - RAG ile */}
                   <VStack spacing={4} align="stretch">
                     {analysis.distortions.map((d, i) => (
                       <Box
@@ -296,20 +353,38 @@ export default function NewEntry() {
                         bg="white"
                         boxShadow="sm"
                       >
-                        <HStack spacing={3} mb={2}>
-                          <Badge colorScheme="purple" variant="subtle">
-                            {d.type}
-                          </Badge>
-                          {d.severity && (
-                            <Badge colorScheme="orange" variant="subtle">
-                              {d.severity}
+                        <HStack spacing={3} mb={2} justify="space-between">
+                          <HStack spacing={3}>
+                            <Badge colorScheme="purple" variant="subtle">
+                              {d.type}
                             </Badge>
-                          )}
-                          {d.confidence && (
-                            <Badge colorScheme="blue" variant="subtle">
-                              %{Math.round(d.confidence * 100)}
-                            </Badge>
-                          )}
+                            {d.severity && (
+                              <Badge colorScheme="orange" variant="subtle">
+                                {d.severity}
+                              </Badge>
+                            )}
+                            {d.confidence && (
+                              <Badge colorScheme="blue" variant="subtle">
+                                %{Math.round(d.confidence * 100)}
+                              </Badge>
+                            )}
+                          </HStack>
+                          {/* RAG Teknikler Butonu */}
+                          <Button
+                            size="sm"
+                            colorScheme="teal"
+                            variant="outline"
+                            onClick={() => {
+                              // RAG modal'ını aç
+                              setAnalysis(prev => ({
+                                ...prev,
+                                selectedDistortion: d.type,
+                                showRAGModal: true
+                              }));
+                            }}
+                          >
+                            💡 Teknikler
+                          </Button>
                         </HStack>
                         <Text fontSize="sm" mb={2}>
                           <strong>İfade:</strong> {d.sentence}
@@ -320,6 +395,32 @@ export default function NewEntry() {
                         <Text fontSize="sm" color="green.600">
                           <strong>Alternatif:</strong> {d.alternative}
                         </Text>
+                        
+                        {/* Kaydedilen RAG Teknikleri */}
+                        {analysis.rag_techniques && analysis.rag_techniques[d.type] && (
+                          <Box mt={3} p={3} bg="teal.50" borderRadius="md" border="1px" borderColor="teal.200">
+                            <HStack spacing={2} mb={2}>
+                              <Text fontSize="sm" fontWeight="bold" color="teal.700">
+                                💡 Kaydedilen Terapi Teknikleri:
+                              </Text>
+                              <Badge colorScheme="teal" variant="subtle" fontSize="xs">
+                                {analysis.rag_techniques[d.type].techniques?.length || 0} teknik
+                              </Badge>
+                            </HStack>
+                            <VStack spacing={2} align="stretch">
+                              {analysis.rag_techniques[d.type].techniques?.slice(0, 2).map((tech, idx) => (
+                                <Text key={idx} fontSize="xs" color="teal.700">
+                                  • {tech.title} ({tech.difficulty})
+                                </Text>
+                              ))}
+                              {analysis.rag_techniques[d.type].techniques?.length > 2 && (
+                                <Text fontSize="xs" color="teal.600" fontStyle="italic">
+                                  ... ve {analysis.rag_techniques[d.type].techniques.length - 2} teknik daha
+                                </Text>
+                              )}
+                            </VStack>
+                          </Box>
+                        )}
                       </Box>
                     ))}
                   </VStack>
@@ -346,6 +447,48 @@ export default function NewEntry() {
                       </Text>
                     </Box>
                   )}
+                </Box>
+              )}
+
+              {/* RAG Modal */}
+              {analysis?.showRAGModal && analysis?.selectedDistortion && (
+                <Box
+                  position="fixed"
+                  top={0}
+                  left={0}
+                  right={0}
+                  bottom={0}
+                  bg="blackAlpha.600"
+                  zIndex={1000}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  p={4}
+                >
+                  <Box
+                    bg="white"
+                    borderRadius="lg"
+                    maxW="4xl"
+                    w="full"
+                    maxH="90vh"
+                    overflow="auto"
+                    p={6}
+                  >
+                    <TherapyTechniques
+                      distortionType={analysis.selectedDistortion}
+                      userContext={content}
+                      onClose={() => {
+                        setAnalysis(prev => ({
+                          ...prev,
+                          showRAGModal: false,
+                          selectedDistortion: null
+                        }));
+                      }}
+                      onSaveTechniques={(techniques) => {
+                        saveRAGTechniques(analysis.selectedDistortion, techniques);
+                      }}
+                    />
+                  </Box>
                 </Box>
               )}
 

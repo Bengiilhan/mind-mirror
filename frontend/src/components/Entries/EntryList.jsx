@@ -3,6 +3,7 @@ import Card from "../UI/Card";
 import Button from "../UI/Button";
 import Badge from "../UI/Badge";
 import Modal from "../UI/Modal";
+import FeedbackCard from "./FeedbackCard";
 
 const EntryList = ({ entries, onDelete, onUpdate, isLoading = false }) => {
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -145,14 +146,12 @@ const EntryList = ({ entries, onDelete, onUpdate, isLoading = false }) => {
             </div>
 
             {selectedEntry.analysis && (
-            <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4">
-          <h4 className="font-medium text-neutral-800 dark:text-neutral-200 mb-2">
-          AI Analiz Sonucu
-          </h4>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 whitespace-pre-line">
-          {selectedEntry.analysis}
-          </p>
-            </div>
+              <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4">
+                <FeedbackCard 
+                  analysis={selectedEntry.analysis} 
+                  userContext={selectedEntry.text}
+                />
+              </div>
             )}
           </div>
         )}

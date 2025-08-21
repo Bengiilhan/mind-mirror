@@ -16,17 +16,23 @@ export default function NewEntry() {
 
   const handleSubmit = async (e) => {
   e.preventDefault();
+  console.log("🚀 Form submit başladı");
+  
   if (!text.trim()) {
     setError("Lütfen bir günlük yazısı girin.");
     return;
   }
 
+  console.log("📝 Yazı uzunluğu:", text.length);
   setIsAnalyzing(true);
   setError("");
 
   try {
+    console.log("🔑 Token kontrol ediliyor...");
     const token = localStorage.getItem("token");
+    console.log("🔑 Token var mı:", !!token);
 
+    console.log("🌐 API çağrısı yapılıyor...");
     const response = await fetch("http://localhost:8000/entries/", {
       method: "POST",
       headers: {
@@ -39,16 +45,22 @@ export default function NewEntry() {
       }),
     });
 
+    console.log("📡 Response status:", response.status);
+    
     if (!response.ok) {
+      console.log("❌ Response error:", response.statusText);
       throw new Error("Günlük yazısı kaydedilemedi");
     }
 
+    console.log("✅ Response başarılı, JSON parse ediliyor...");
     const data = await response.json(); // response → entry objesi
 
     // Gerçek analiz sonucunu al:
+    console.log("🔍 Backend'den gelen analiz sonucu:", data.analysis);
     setAnalysis(data.analysis); // ✅ backend'den gelen JSON
     setIsAnalyzing(false);
   } catch (err) {
+    console.log("💥 Hata oluştu:", err.message);
     setError(err.message || "Bir hata oluştu.");
     setIsAnalyzing(false);
   }
@@ -142,7 +154,7 @@ export default function NewEntry() {
       )}
 
       {analysis && !isAnalyzing && (
-        <FeedbackCard analysis={analysis} />
+        <FeedbackCard analysis={analysis} userContext={text} />
       )}
     </div>
   );

@@ -1,8 +1,12 @@
-import React from "react";
+import React, { useState } from "react";
 import Card from "../UI/Card";
 import Badge from "../UI/Badge";
+import Button from "../UI/Button";
+import TherapyTechniques from "../TherapyTechniques";
 
-const FeedbackCard = ({ analysis, isLoading = false }) => {
+const FeedbackCard = ({ analysis, isLoading = false, userContext = "" }) => {
+  const [showTechniques, setShowTechniques] = useState(false);
+  const [selectedDistortion, setSelectedDistortion] = useState(null);
   if (isLoading) {
     return (
       <Card className="animate-pulse">
@@ -41,7 +45,19 @@ const FeedbackCard = ({ analysis, isLoading = false }) => {
               key={index}
               className="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg bg-neutral-50 dark:bg-neutral-800 space-y-2"
             >
-              <Badge variant={getDistortionColor(d.type)}>{d.type}</Badge>
+              <div className="flex justify-between items-start">
+                <Badge variant={getDistortionColor(d.type)}>{d.type}</Badge>
+                <Button
+                  onClick={() => {
+                    setSelectedDistortion(d.type);
+                    setShowTechniques(true);
+                  }}
+                  variant="secondary"
+                  size="sm"
+                >
+                  💡 Teknikler
+                </Button>
+              </div>
               <p className="text-sm text-neutral-700 dark:text-neutral-300">
                 <strong>İfade:</strong> {d.sentence}
               </p>
@@ -53,6 +69,24 @@ const FeedbackCard = ({ analysis, isLoading = false }) => {
               </p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* RAG Techniques Modal */}
+      {showTechniques && selectedDistortion && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <TherapyTechniques
+                distortionType={selectedDistortion}
+                userContext={userContext}
+                onClose={() => {
+                  setShowTechniques(false);
+                  setSelectedDistortion(null);
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </Card>

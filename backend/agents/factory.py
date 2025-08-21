@@ -4,6 +4,7 @@ Agent Factory - Farklı agent türlerini oluşturmak için factory pattern
 
 from typing import Dict, Type, Optional
 from .cognitive_agent import CognitiveAnalysisAgent
+from .rag_agent import RAGAgent
 from .config import AgentConfig
 
 class AgentFactory:
@@ -12,6 +13,7 @@ class AgentFactory:
     _agents: Dict[str, object] = {}
     _agent_types: Dict[str, Type] = {
         "cognitive": CognitiveAnalysisAgent,
+        "rag": RAGAgent,
     }
     
     @classmethod

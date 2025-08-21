@@ -261,3 +261,7 @@ app.include_router(analyze_router, prefix="/analyze", tags=["AI Analysis"])
 # İstatistik router'ını ekle
 from routers.statistics import router as statistics_router
 app.include_router(statistics_router, tags=["Statistics"])
+
+# RAG router'ını ekle
+from routers.rag import router as rag_router
+app.include_router(rag_router, prefix="/rag", tags=["RAG - Terapi Teknikleri"])
