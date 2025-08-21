@@ -322,5 +322,21 @@ Sorun yaşıyorsanız:
 
 ---
 
+## 🧪 Test Örneği
+
+Sistemi test etmek için aşağıdaki örnek günlük yazısını kullanabilirsiniz:
+
+```
+Bugün sınavda bir soruyu yanlış yaptım. Her zaman böyle hatalar yapıyorum ve hiçbir zaman başarılı olamayacağım. Bu yanlış yüzünden kesinlikle sınıfta kalacağım.
+```
+
+Bu yazıda şu bilişsel çarpıtmalar bulunur:
+- **Genelleme**: "Her zaman böyle hatalar yapıyorum"
+- **Felaketleştirme**: "Bu yanlış yüzünden kesinlikle sınıfta kalacağım"
+
+Sistemi test etmek için bu yazıyı kopyalayıp yeni günlük girişi sayfasına yapıştırın!
+
+---
+
 **Not:** Bu proje LangChain 0.2.16 sürümü ile uyumludur. GPT-4o-mini modeli kullanılarak hız ve maliyet optimizasyonu sağlanmıştır. Structured output ve fallback sistemi ile güvenilir analiz sonuçları garanti edilir.
 
