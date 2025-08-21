@@ -413,26 +413,32 @@ class RAGAgent:
             "felaketleştirme": "felaketleştirme",
             "felaketlestirme": "felaketleştirme",
             "zihin okuma": "zihin okuma",
+            "zihin_okuma": "zihin okuma",  # Alt çizgi formatı
             "genelleme": "genelleme",
             "kişiselleştirme": "kişiselleştirme",
             "kisisellestirme": "kişiselleştirme",
+            "kisisellestirme": "kişiselleştirme",  # Alt çizgi formatı
             "etiketleme": "etiketleme",
             "ya hep ya hiç": "ya hep ya hiç",
             "ya hep ya hic": "ya hep ya hiç",
+            "ya_hep_ya_hic": "ya hep ya hiç",  # Alt çizgi formatı
             "büyütme": "büyütme/küçültme",
             "buyutme": "büyütme/küçültme",
+            "buyutme_kucultme": "büyütme/küçültme",  # Alt çizgi formatı
             "küçültme": "büyütme/küçültme",
             "kucultme": "büyütme/küçültme",
             "kehanetçilik": "kehanetçilik",
             "kehanetcilik": "kehanetçilik",
             "keyfi çıkarsama": "keyfi çıkarsama",
-            "keyfi cikarsama": "keyfi çıkarsama",
+            "keyfi_cikarsama": "keyfi çıkarsama",  # Alt çizgi formatı
             "meli malı": "meli/malı düşünceleri",
             "meli/malı": "meli/malı düşünceleri",
-            "meli-malı": "meli/malı düşünceleri"
+            "meli-malı": "meli/malı düşünceleri",
+            "meli_mali": "meli/malı düşünceleri"  # Alt çizgi formatı
         }
         
-        return mappings.get(type_lower, type_lower)
+        normalized = mappings.get(type_lower, type_lower)
+        return normalized
 
     async def _personalize_techniques(self, base_techniques: Dict, user_context: str, distortion_type: str) -> Dict[str, Any]:
         """Kullanıcı bağlamına göre teknikleri kişiselleştirir"""

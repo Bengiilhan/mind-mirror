@@ -7,6 +7,8 @@ import TherapyTechniques from "../TherapyTechniques";
 const FeedbackCard = ({ analysis, isLoading = false, userContext = "" }) => {
   const [showTechniques, setShowTechniques] = useState(false);
   const [selectedDistortion, setSelectedDistortion] = useState(null);
+  
+
   if (isLoading) {
     return (
       <Card className="animate-pulse">
@@ -67,6 +69,8 @@ const FeedbackCard = ({ analysis, isLoading = false, userContext = "" }) => {
               <p className="text-sm text-neutral-700 dark:text-neutral-300">
                 <strong>Alternatif:</strong> {d.alternative}
               </p>
+              
+
             </div>
           ))}
         </div>

@@ -147,6 +147,7 @@ const EntryList = ({ entries, onDelete, onUpdate, isLoading = false }) => {
 
             {selectedEntry.analysis && (
               <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4">
+        
                 <FeedbackCard 
                   analysis={selectedEntry.analysis} 
                   userContext={selectedEntry.text}

@@ -11,6 +11,13 @@ Zihin Aynası, kullanıcıların duygularını günlüğe kaydetmelerine ve yaz�
 - **Structured Output**: Pydantic modelleri ile güvenilir JSON çıktısı
 - **Fallback Sistemi**: Çok aşamalı hata yönetimi ve JSON çıkarma
 
+### 💡 Kişiselleştirilmiş Terapi Teknikleri Sistemi
+- **Çarpıtma Tabanlı Teknikler**: Her bilişsel çarpıtma türü için özel CBT teknikleri
+- **AI Kişiselleştirme**: Kullanıcı bağlamına göre uyarlanmış terapi egzersizleri
+- **Zorluk Seviyesi**: Kolay, orta, zor kategorilerinde teknikler
+- **Pratik Egzersizler**: Uygulanabilir adım adım terapi teknikleri
+- **Sonraki Adımlar**: Kişisel gelişim için yol haritası
+
 ### 📊 Gelişmiş İstatistikler
 - **Mood Takibi**: Duygu durumu trend analizi ve grafikleri
 - **Çarpıtma İstatistikleri**: En yaygın bilişsel çarpıtmaların analizi
@@ -38,11 +45,13 @@ mind-mirror/
 ├── backend/
 │   ├── agents/                 # 🤖 AI Agent Sistemi
 │   │   ├── cognitive_agent.py  # Ana analiz agent'ı
+│   │   ├── rag_agent.py        # RAG terapi teknikleri agent'ı
 │   │   ├── factory.py          # Agent factory pattern
 │   │   ├── config.py           # Konfigürasyon ayarları
 │   │   └── automation.md       # Otomasyon dokümantasyonu
 │   ├── routers/
-│   │   └── statistics.py       # İstatistik API'leri
+│   │   ├── statistics.py       # İstatistik API'leri
+│   │   └── rag.py              # RAG terapi teknikleri API'leri
 │   ├── services/
 │   │   └── statistics_service.py # İstatistik ve rapor servisleri
 │   ├── models.py               # Veritabanı modelleri
@@ -55,6 +64,7 @@ mind-mirror/
 │   │   │   │   ├── MoodChart.jsx
 │   │   │   │   └── DistortionChart.jsx
 │   │   │   ├── Statistics.jsx  # Ana istatistik sayfası
+│   │   │   ├── TherapyTechniques.jsx # 💡 RAG terapi teknikleri
 │   │   │   └── UI/             # UI bileşenleri
 │   │   └── pages/              # Sayfa bileşenleri
 │   └── package.json
@@ -157,6 +167,28 @@ result = await agent.analyze_entry(
 - **Alternatif Düşünce**: Kişiselleştirilmiş öneriler
 - **Memory Sistemi**: ConversationBufferMemory ile geçmiş hatırlama
 
+### Terapi Teknikleri Agent
+
+Çarpıtma türüne göre kişiselleştirilmiş terapi teknikleri öneren agent:
+
+```python
+from agents.rag_agent import RAGAgent
+
+therapy_agent = RAGAgent()
+techniques = await therapy_agent.get_therapy_techniques(
+    distortion_type="felaketleştirme",
+    user_context="Kullanıcı yazısı"
+)
+```
+
+**Özellikler:**
+- **Çarpıtma Tabanlı Teknikler**: Her bilişsel çarpıtma türü için özel CBT teknikleri
+- **AI Kişiselleştirme**: Kullanıcı bağlamına göre uyarlanmış öneriler
+- **Zorluk Seviyeleri**: Kolay, orta, zor kategorilerinde teknikler
+- **Pratik Egzersizler**: Uygulanabilir adım adım terapi teknikleri
+- **Sonraki Adımlar**: Kişisel gelişim için yol haritası
+- **10 Çarpıtma Türü**: Her çarpıtma için özel teknikler
+
 ### Statistics Service
 
 İstatistik ve rapor üretimi için gelişmiş servis:
@@ -221,6 +253,12 @@ available_agents = agent_factory.get_available_agents()
 - `POST /analyze/batch` - Toplu analiz
 - `GET /analyze/memory/{user_id}` - Kullanıcı memory'si
 - `DELETE /analyze/memory/{user_id}` - Memory temizleme
+
+### Terapi Teknikleri
+- `POST /rag/techniques/` - Belirli çarpıtma için terapi teknikleri
+- `POST /rag/techniques/multiple/` - Birden fazla çarpıtma için teknikler
+- `GET /rag/distortions/` - Mevcut çarpıtma türleri
+- `GET /rag/health/` - Terapi teknikleri sistemi sağlık kontrolü
 
 ### İstatistikler
 - `GET /statistics/` - Kullanıcı istatistikleri

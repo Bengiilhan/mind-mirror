@@ -8,6 +8,7 @@ Bu klasör, Zihin Aynası projesinin **LangChain tabanlı AI Agent sistemini** i
 agents/
 ├── __init__.py              # Paket başlatıcı
 ├── cognitive_agent.py       # Ana analiz agent'ı
+├── rag_agent.py             # Terapi teknikleri agent'ı
 ├── factory.py               # Agent factory pattern
 ├── config.py                # Konfigürasyon ayarları
 ├── test_agent.py            # Test dosyası
@@ -37,7 +38,31 @@ agent = CognitiveAnalysisAgent()
 result = await agent.analyze_entry(text="Günlük yazısı", user_id="user123")
 ```
 
-### 2. Statistics Service (Agent Dışında)
+### 2. Terapi Teknikleri Agent
+**Dosya:** `rag_agent.py`
+
+**Görev:** Bilişsel çarpıtma türlerine göre kişiselleştirilmiş terapi teknikleri önerir.
+
+**Özellikler:**
+- Çarpıtma tabanlı CBT teknikleri
+- AI kişiselleştirme ile uyarlanmış öneriler
+- Zorluk seviyeleri (kolay, orta, zor)
+- Pratik egzersizler ve adım adım teknikler
+- 10 farklı çarpıtma türü için özel teknikler
+- Sonraki adımlar ve kişisel gelişim yol haritası
+
+**Kullanım:**
+```python
+from agents.rag_agent import RAGAgent
+
+therapy_agent = RAGAgent()
+techniques = await therapy_agent.get_therapy_techniques(
+    distortion_type="felaketleştirme",
+    user_context="Kullanıcı yazısı"
+)
+```
+
+### 3. Statistics Service (Agent Dışında)
 **Dosya:** `../services/statistics_service.py`
 
 **Görev:** İstatistik hesaplama ve rapor üretimi.
@@ -107,6 +132,7 @@ python test_agent.py
 **Test Kapsamı:**
 - Agent oluşturma
 - Metin analizi
+- Terapi teknikleri
 - Rapor üretimi
 - Factory pattern
 - Hata yönetimi
@@ -137,10 +163,12 @@ Report Agent kaldırıldı. Rapor üretimi artık `statistics_service.py` ile ya
 ## 📊 Performans
 
 **Analiz Süresi:** 2-4 saniye (GPT-4o-mini ile)
+**Terapi Teknik Süresi:** 3-5 saniye
 **Başarı Oranı:** %95+
 **Memory Kullanımı:** 45MB
 **API Çağrı Sayısı:** 1500/gün
 **Model:** GPT-4o-mini (hız/maliyet/kalite dengesi)
+**Terapi Teknik Sayısı:** 10 çarpıtma türü × 3-5 teknik = 30-50 teknik
 
 ## 🔧 Hata Ayıklama
 
@@ -182,6 +210,12 @@ agent.clear_memory()
 - `GET /analyze/memory/{user_id}` - Kullanıcı memory'si
 - `DELETE /analyze/memory/{user_id}` - Memory temizleme
 - `GET /analyze/health` - Sağlık kontrolü
+
+### Terapi Teknikleri
+- `POST /rag/techniques/` - Belirli çarpıtma için terapi teknikleri
+- `POST /rag/techniques/multiple/` - Birden fazla çarpıtma için teknikler
+- `GET /rag/distortions/` - Mevcut çarpıtma türleri
+- `GET /rag/health/` - Terapi teknikleri sistemi sağlık kontrolü
 
 ## 🤝 Katkıda Bulunma
 

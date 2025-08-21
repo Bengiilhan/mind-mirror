@@ -15,11 +15,11 @@ import {
   useColorModeValue,
 } from '@chakra-ui/react';
 
-export default function TherapyTechniques({ distortionType, userContext, onClose, onSaveTechniques }) {
+export default function TherapyTechniques({ distortionType, userContext, onClose }) {
   const [techniques, setTechniques] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedTechnique, setSelectedTechnique] = useState(null);
+
 
   useEffect(() => {
     if (distortionType) {
@@ -176,19 +176,9 @@ export default function TherapyTechniques({ distortionType, userContext, onClose
                 </Text>
               </Box>
               
-              <HStack justify="space-between" align="center">
-                <Text fontSize="sm" color="gray.500">
-                  ⏱️ {technique.duration}
-                </Text>
-                <Button
-                  onClick={() => setSelectedTechnique(technique)}
-                  colorScheme="blue"
-                  variant="outline"
-                  size="sm"
-                >
-                  Detayları Gör
-                </Button>
-              </HStack>
+                             <Text fontSize="sm" color="gray.500">
+                 ⏱️ {technique.duration}
+               </Text>
             </CardBody>
           </Card>
         ))}
@@ -213,93 +203,10 @@ export default function TherapyTechniques({ distortionType, userContext, onClose
         </Card>
       )}
 
-      {/* Technique Detail Modal */}
-      {selectedTechnique && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-gray-800">
-                {selectedTechnique.title}
-              </h3>
-              <Button
-                onClick={() => setSelectedTechnique(null)}
-                variant="ghost"
-                size="sm"
-              >
-                ✕
-              </Button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-medium text-gray-800 mb-2">Açıklama:</h4>
-                <p className="text-gray-600">{selectedTechnique.description}</p>
-              </div>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">Egzersiz:</h4>
-                <p className="text-blue-700">{selectedTechnique.exercise}</p>
-              </div>
-              
-              <div className="flex justify-between items-center text-sm text-gray-500">
-                <span>⏱️ Süre: {selectedTechnique.duration}</span>
-                <span className={`px-2 py-1 rounded-full ${getDifficultyColor(selectedTechnique.difficulty)}`}>
-                  {getDifficultyText(selectedTechnique.difficulty)}
-                </span>
-              </div>
-              
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="font-medium text-green-800 mb-2">💡 İpucu:</h4>
-                <p className="text-green-700 text-sm">
-                  Bu egzersizi günlük rutininize ekleyin. İlk başta zor gelebilir ama 
-                  düzenli uyguladığınızda düşünce kalıplarınızı değiştirmeye başlayacaksınız.
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button
-                onClick={() => setSelectedTechnique(null)}
-                variant="secondary"
-              >
-                Kapat
-              </Button>
-              <Button
-                onClick={() => {
-                  // Burada kullanıcının seçtiği tekniği kaydedebiliriz
-                  setSelectedTechnique(null);
-                }}
-                variant="primary"
-              >
-                Bu Tekniği Seç
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      
 
       {/* Action Buttons */}
-      <Box textAlign="center" mt={6}>
-        <HStack spacing={4} justify="center">
-          {onSaveTechniques && (
-            <Button 
-              onClick={() => {
-                onSaveTechniques(techniques);
-                onClose();
-              }}
-              colorScheme="green"
-              size="lg"
-              px={8}
-              py={3}
-              fontSize="lg"
-              fontWeight="semibold"
-              shadow="lg"
-              _hover={{ shadow: 'xl' }}
-              transition="all 0.2s"
-            >
-              💾 Teknikleri Kaydet
-            </Button>
-          )}
+              <Box textAlign="center" mt={6}>
           <Button 
             onClick={onClose} 
             colorScheme="blue"
@@ -314,8 +221,7 @@ export default function TherapyTechniques({ distortionType, userContext, onClose
           >
             ✕ Kapat
           </Button>
-        </HStack>
-      </Box>
+        </Box>
     </VStack>
   );
 }
