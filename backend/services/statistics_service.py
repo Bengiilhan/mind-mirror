@@ -429,8 +429,8 @@ class StatisticsService:
         })
         
         recommendations["emergency_tools"].append({
-            "title": "Mantra Tekrarı",
-            "description": "Kendinize 'Bu geçecek' veya 'Ben güçlüyüm' gibi pozitif bir cümle tekrarlayın.",
+            "title": "Güçlendirici Mantra Tekrarı",
+            "description": "Zorlu bir düşünceyle karşılaştığında, durup bu cümlelerden birini veya kendin için anlamlı olan bir başkasını tekrarla: 'Bu sadece bir düşünce, bir gerçek değil.', 'Duygularım misafir, gelip geçecekler.', 'Kontrol edebileceğim tek şey şu anki nefesim.'",
             "duration": "3 dakika",
             "when_to_use": "Olumsuz düşünceler geldiğinde"
         })
