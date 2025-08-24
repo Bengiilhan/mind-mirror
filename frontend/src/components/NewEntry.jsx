@@ -66,7 +66,7 @@ export default function NewEntry() {
 
   // Risk seviyesi ikonu
   const getRiskIcon = (riskLevel) => {
-    switch (riskLevel?.toLowerCase()) {
+    switch (riskLevel) {
       case 'yüksek':
         return <WarningIcon color="red.500" />;
       case 'orta':
@@ -77,34 +77,6 @@ export default function NewEntry() {
         return <InfoIcon color="gray.500" />;
     }
   };
-
-  const checkStatisticsMilestone = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/statistics/should-generate", {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.should_generate) {
-          toast({
-            title: "🎉 Yeni İstatistikler Hazır!",
-            description: `${data.entry_count} giriş yaptınız. İstatistikler sayfasından ilerlemenizi görebilirsiniz.`,
-            status: "success",
-            duration: 5000,
-            isClosable: true,
-          });
-        }
-      }
-    } catch (err) {
-      // İstatistik kontrol hatası sessizce geçiriliyor
-    }
-  };
-
-  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -171,7 +143,6 @@ export default function NewEntry() {
         setSuccess("Günlük girişi başarıyla kaydedildi ve analiz edildi!");
         
         // İstatistik kontrolü yap
-        checkStatisticsMilestone();
         
               } else {
         let errorData;
@@ -203,7 +174,7 @@ export default function NewEntry() {
           setSuccess("Günlük girişi kaydedildi (analiz başarısız)");
           
           // İstatistik kontrolü yap
-          checkStatisticsMilestone();
+          
         }
       }
       

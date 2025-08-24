@@ -33,33 +33,6 @@ async def get_user_statistics(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"İstatistik hatası: {str(e)}")
 
-@router.get("/should-generate")
-async def should_generate_statistics(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """İstatistik oluşturulup oluşturulmayacağını kontrol eder"""
-    try:
-        from models import Entry
-        
-        # Kullanıcının giriş sayısını al
-        entry_count = db.query(Entry).filter(Entry.user_id == current_user.id).count()
-        
-        stats_service = StatisticsService()
-        should_generate = stats_service.should_generate_stats(entry_count)
-        
-        next_milestone = stats_service.get_next_milestone(entry_count)
-        
-        return {
-            "entry_count": entry_count,
-            "should_generate": should_generate,
-            "next_milestone": next_milestone,
-            "is_milestone": entry_count == 5 or (entry_count > 5 and entry_count % 10 == 0)
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Kontrol hatası: {str(e)}")
-
 @router.get("/insights")
 async def get_ai_insights(
     current_user: User = Depends(get_current_user),

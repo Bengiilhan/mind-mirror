@@ -4,6 +4,7 @@ Bu servis, kullanıcının günlük girişlerini analiz ederek istatistiksel rap
 """
 
 import json
+import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
@@ -13,30 +14,14 @@ from sqlalchemy import func, desc
 from models import Entry, Analysis, User
 from agents.cognitive_agent import CognitiveAnalysisAgent
 
+# Logging konfigürasyonu
+logger = logging.getLogger(__name__)
+
 class StatisticsService:
     """Kullanıcı istatistikleri için servis"""
     
     def __init__(self):
         self.cognitive_agent = CognitiveAnalysisAgent()
-    
-    def should_generate_stats(self, entry_count: int) -> bool:
-        """İstatistik oluşturulup oluşturulmayacağını belirler"""
-        # İlk 5 girişte istatistik oluştur
-        if entry_count == 5:
-            return True
-        
-        # Sonrasında her 10 girişte bir güncelle
-        if entry_count > 5 and entry_count % 10 == 0:
-            return True
-        
-        return False
-    
-    def get_next_milestone(self, entry_count: int) -> int:
-        """Bir sonraki milestone'u döndürür"""
-        if entry_count < 5:
-            return 5
-        else:
-            return ((entry_count // 10) + 1) * 10
     
     def get_user_statistics(self, db: Session, user_id: int) -> Dict[str, Any]:
         """Kullanıcının istatistiklerini hesaplar"""
@@ -475,24 +460,185 @@ class StatisticsService:
             
             # Son 5 girişi al
             recent_texts = entry_texts[-5:] if len(entry_texts) >= 5 else entry_texts
-            combined_text = "\n\n".join(recent_texts)
             
-            prompt = f"""
-            Son günlük girişlerini analiz et ve kısa bir özet çıkar.
+            # Giriş metinlerini kısalt (token limitini aşmamak için)
+            shortened_texts = []
+            for text in recent_texts:
+                if len(text) > 200:  # 200 karakterden uzunsa kısalt
+                    shortened_texts.append(text[:200] + "...")
+                else:
+                    shortened_texts.append(text)
             
-            Girişler:
-            {combined_text}
+            combined_text = "\n\n".join(shortened_texts)
             
-            İstatistikler:
-            - Toplam çarpıtma: {stats.get('total_distortions', 0)}
-            - En yaygın çarpıtma: {stats.get('distortion_stats', {}).get('most_common', [{}])[0].get('type', 'bilinmeyen') if stats.get('distortion_stats', {}).get('most_common') else 'bilinmeyen'}
-            - Ruh hali: {stats.get('mood_analysis', {}).get('dominant_mood', 'belirsiz')}
+            # Daha basit ve net bir prompt
+            prompt = f"""Bir BDT terapisti olarak, aşağıdaki günlük girişlerini ve istatistikleri analiz et.
+Kullanıcıya "sen" diye hitap ederek, durumu özetleyen, en yaygın bilişsel çarpıtmasına odaklanan ve 2-3 adet somut iyileşme stratejisi sunan yapıcı bir geri bildirim yaz.
+
+Yanıtını emojilerle yapılandır:
+- Özet için 🎯 kullan.
+- Stratejiler için 🚀 kullan ve her stratejiyi yeni bir satıra yaz.
+
+Cevabın kısa ve anlaşılır olsun.
+
+Girişler:
+{combined_text}
+
+İstatistikler:
+- Toplam çarpıtma: {stats.get('total_distortions', 0)}
+- En yaygın çarpıtma: {stats.get('distortion_stats', {}).get('most_common', [{}])[0].get('type', 'bilinmeyen') if stats.get('distortion_stats', {}).get('most_common') else 'bilinmeyen'}
+- Ruh hali: {stats.get('mood_analysis', {}).get('dominant_mood', 'belirsiz')}
+
+Analizin:"""
             
-            Kısa ve yapıcı bir özet yaz (2-3 cümle). Doğrudan sen'e hitap et, "kullanıcı" kelimesini kullanma:
-            """
-            
-            response = await self.cognitive_agent.llm.ainvoke(prompt)
-            return response.content.strip()
+            # LLM çağrısını güvenli hale getir
+            try:
+                # JSON formatı zorunlu olmayan text_llm'i kullan
+                response = await self.cognitive_agent.text_llm.ainvoke(prompt)
+                return response.content.strip()
+            except Exception as llm_error:
+                logger.error(f"LLM call failed with error: {llm_error}", exc_info=True) # Hatanın tam traceback'ini logla
+                # Fallback: Basit bir özet üret
+                return self._generate_fallback_insights(stats)
             
         except Exception as e:
-            return f"AI analizi sırasında hata: {str(e)}"
+            logger.error(f"AI insights generation failed: {str(e)}", exc_info=True) # Hatanın tam traceback'ini logla
+            return self._generate_fallback_insights(stats)
+    
+    def _generate_fallback_insights(self, stats: Dict[str, Any]) -> str:
+        """LLM hatası durumunda detaylı ve faydalı içgörüler üretir"""
+        try:
+            total_distortions = stats.get('total_distortions', 0)
+            entry_count = stats.get('entry_count', 0)
+            mood_analysis = stats.get('mood_analysis', {})
+            risk_analysis = stats.get('risk_analysis', {})
+            
+            if total_distortions == 0:
+                return """🎉 MÜKEMMEL HABER!
+
+Henüz bilişsel çarpıtma tespit edilmedi. Düşüncelerin dengeli görünüyor.
+
+✨ Bu durum şunları gösteriyor:
+• Zihinsel sağlığınız iyi durumda
+• Düşünce kalıplarınız sağlıklı
+• BDT tekniklerini doğal olarak uyguluyorsunuz
+
+🚀 Önerim:
+Düşünce kalıplarınızı gözlemlemeye devam edin. Bu farkındalık, gelecekte olası çarpıtmaları erken tespit etmenizi sağlayacak."""
+            
+            # En yaygın çarpıtma analizi
+            most_common = stats.get('distortion_stats', {}).get('most_common', [])
+            if most_common:
+                distortion_type = most_common[0].get('type', 'bilinmeyen')
+                count = most_common[0].get('count', 0)
+                percentage = most_common[0].get('percentage', 0)
+                
+                # Çarpıtma türüne özel açıklama ve öneriler
+                distortion_explanations = {
+                    "genelleme": "Genelleme çarpıtması, tek bir olaydan yola çıkarak tüm durumlar hakkında geniş yargılar yapmanızdır. Bu, 'her zaman', 'hiçbir zaman', 'herkes' gibi kelimelerle kendini gösterir.",
+                    "felaketleştirme": "Felaketleştirme, gelecekte olacakları en kötü şekilde varsaymanızdır. Bu çarpıtma, kaygı ve stresi artırır.",
+                    "zihin okuma": "Zihin okuma, başkalarının düşüncelerini bildiğinizi varsaymanızdır. Bu, yanlış varsayımlara ve iletişim sorunlarına yol açar.",
+                    "kişiselleştirme": "Kişiselleştirme, alakasız olayları bile kendinizle ilişkilendirmenizdir. Bu, gereksiz suçluluk ve öz eleştiri yaratır.",
+                    "etiketleme": "Etiketleme, kendinizi veya başkalarını tek bir özellik üzerinden değerlendirmenizdir. Bu, karmaşık insanları basitleştirir.",
+                    "ya hep ya hiç": "Ya hep ya hiç düşüncesi, durumları sadece siyah veya beyaz olarak görmenizdir. Bu, esnekliği azaltır.",
+                    "büyütme/küçültme": "Büyütme/küçültme, olumsuz yanları abartıp olumlu yanları küçümsemenizdir.",
+                    "kehanetçilik": "Kehanetçilik, geleceği olumsuz tahmin etmenizdir. Bu, umutsuzluk yaratır.",
+                    "keyfi çıkarsama": "Keyfi çıkarsama, yeterli kanıt olmadan sonuçlara varmanızdır.",
+                    "-meli/-malı düşünceleri": "-meli/-malı düşünceleri, katı kurallar koyup bunlara uymayı beklemenizdir."
+                }
+                
+                explanation = distortion_explanations.get(distortion_type.lower(), f"{distortion_type} çarpıtması, düşünce kalıplarınızda tekrarlanan bir hatadır.")
+                
+                # Çarpıtma türüne özel öneriler
+                specific_recommendations = {
+                    "genelleme": "Genelleme yaparken 'her zaman' yerine 'bazen', 'hiçbir zaman' yerine 'nadiren' gibi kelimeler kullanmayı deneyin. Her durumun kendine özgü olduğunu hatırlayın.",
+                    "felaketleştirme": "En kötü senaryoyu yazın, sonra bunun gerçekleşme olasılığını değerlendirin. Farklı sonuçların da mümkün olduğunu düşünün.",
+                    "zihin okuma": "Başkalarının düşüncelerini tahmin etmek yerine doğrudan sorun. 'Sen ne düşünüyorsun?' diye sormaktan çekinmeyin.",
+                    "kişiselleştirme": "Bir olay olduğunda, kendinizi suçlamadan önce 3 farklı açıklama düşünün. Her şeyin sizinle ilgili olmadığını hatırlayın.",
+                    "etiketleme": "Kendinizi veya başkalarını etiketlemek yerine, davranışları değerlendirin. 'Ben aptalım' yerine 'Bu konuda hata yaptım' deyin.",
+                    "ya hep ya hiç": "Gri tonları arayın. Mükemmel olmamak, başarısız olmak anlamına gelmez.",
+                    "büyütme/küçültme": "Olumlu yanları da görün. Başarılarınızı küçümsemeyin, hatalarınızı da abartmayın.",
+                    "kehanetçilik": "Geleceği tahmin etmeye çalışmayın. Şu ana odaklanın ve kontrol edebileceğiniz şeylere konsantre olun.",
+                    "keyfi çıkarsama": "Kanıtları değerlendirin. Düşüncelerinizi destekleyen ve çürüten argümanları listeleyin.",
+                    "-meli/-malı düşünceleri": "Kurallarınızı esnek hale getirin. 'Yapmalıyım' yerine 'Yapmak istiyorum' deyin."
+                }
+                
+                recommendation = specific_recommendations.get(distortion_type.lower(), "Bu çarpıtma türü hakkında daha fazla bilgi edinmek ve pratik yapmak faydalı olacaktır.")
+                
+                # Mood analizi ekle
+                dominant_mood = mood_analysis.get('dominant_mood', 'belirsiz')
+                mood_insight = ""
+                if dominant_mood in ["üzgün", "çok üzgün"]:
+                    mood_insight = " Ruh haliniz genellikle düşük görünüyor. Bu durum, çarpıtmaların etkisini artırabilir. Günlük pozitif aktivitelere odaklanmayı deneyin."
+                elif dominant_mood in ["mutlu", "çok mutlu"]:
+                    mood_insight = " Ruh haliniz genellikle iyi görünüyor. Bu, çarpıtmalarla başa çıkmada size avantaj sağlıyor."
+                
+                # Risk analizi ekle
+                risk_insight = ""
+                high_risk_percentage = risk_analysis.get('high_risk_percentage', 0)
+                if high_risk_percentage > 20:
+                    risk_insight = f" Yüksek risk yüzdeleriniz var (%{high_risk_percentage}). Bu durum, profesyonel destek almayı düşünmenizi önerir."
+                elif high_risk_percentage > 10:
+                    risk_insight = f" Orta seviyede risk yüzdeleriniz var (%{high_risk_percentage}). Düşünce kalıplarınızı gözlemlemeye devam edin."
+                
+                # İyileşme önerileri
+                improvement_tips = [
+                    "Her gün 5 dakika düşünce günlüğü tutun",
+                    "Çarpıtma tespit ettiğinizde alternatif düşünceler üretin",
+                    "Mindfulness pratikleri yapın",
+                    "Güvenilir bir arkadaşla düşüncelerinizi paylaşın",
+                    "Profesyonel destek almayı düşünün"
+                ]
+                
+                # Detaylı içgörü oluştur
+                detailed_insight = f"""
+🎯 ÇARPITMA ANALİZİ
+
+{explanation}
+
+📊 İSTATİSTİKLER
+• En yaygın çarpıtmanız: {distortion_type} ({count} kez, %{percentage})
+• Toplam çarpıtma sayısı: {total_distortions}
+
+💡 ÖNERİM
+{recommendation}
+
+{mood_insight}{risk_insight}
+
+🚀 İYİLEŞME İÇİN ÖNERİLER
+• {improvement_tips[0]}
+• {improvement_tips[1]}
+• {improvement_tips[2]}
+• {improvement_tips[3]}
+• {improvement_tips[4]}
+
+✨ SONUÇ
+Bu analiz, düşünce kalıplarınızı gözlemleme ve iyileştirme fırsatıdır. Her çarpıtma, büyüme ve öğrenme şansıdır. Kendinizi yargılamadan, merakla gözlemlemeye devam edin.
+                 """.strip()
+                
+                return detailed_insight
+            
+            return """📊 GENEL DURUM
+
+Toplam {total_distortions} çarpıtma tespit edildi.
+
+💡 Bu ne anlama geliyor:
+• Düşünce kalıplarınızı gözlemlemeye devam edin
+• Her çarpıtma, kendinizi daha iyi anlama fırsatıdır
+• Farkındalık, değişimin ilk adımıdır
+
+🚀 Sonraki adım:
+Daha fazla günlük girişi yaparak istatistiklerinizi geliştirin. Her giriş, kendinizi daha iyi anlama yolculuğunda bir adımdır.""".format(total_distortions=total_distortions)
+            
+        except Exception as e:
+            return """❌ TEKNİK HATA
+
+İçgörü üretilemedi.
+
+💡 Ne yapabilirsiniz:
+• Daha fazla günlük girişi yaparak istatistiklerinizi geliştirin
+• Her giriş, kendinizi daha iyi anlama yolculuğunda bir adımdır
+• Teknik sorun çözüldüğünde AI analizi tekrar kullanılabilir olacak
+
+🚀 Şimdilik:
+Mevcut istatistiklerinizi inceleyerek kendinizi değerlendirebilirsiniz."""

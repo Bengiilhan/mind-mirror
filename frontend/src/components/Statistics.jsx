@@ -37,23 +37,22 @@ import {
 import { CheckCircleIcon, WarningIcon, InfoIcon, ArrowBackIcon, TimeIcon, StarIcon } from '@chakra-ui/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+
 const Statistics = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [shouldGenerate, setShouldGenerate] = useState(false);
-  const [isMilestone, setIsMilestone] = useState(false);
-  const [nextMilestone, setNextMilestone] = useState(5);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchStatistics();
-    checkShouldGenerate();
+    fetchStats();
   }, []);
 
-  const fetchStatistics = async () => {
+  const fetchStats = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:8000/statistics/', {
         headers: {
@@ -74,28 +73,9 @@ const Statistics = () => {
     }
   };
 
-  const checkShouldGenerate = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/statistics/should-generate', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setShouldGenerate(data.should_generate);
-        setIsMilestone(data.is_milestone);
-        setNextMilestone(data.next_milestone);
-      }
-    } catch (err) {
-      console.error('İstatistik kontrol hatası:', err);
-    }
-  };
-
   const fetchAIInsights = async () => {
     try {
+      setAiInsightsLoading(true);
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:8000/statistics/insights', {
         headers: {
@@ -112,14 +92,41 @@ const Statistics = () => {
           status: 'success',
           duration: 3000,
         });
+      } else {
+        // HTTP hata kodları için daha detaylı hata mesajları
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.detail || 'AI içgörüleri yüklenemedi';
+        
+        toast({
+          title: 'Hata',
+          description: errorMessage,
+          status: 'error',
+          duration: 5000,
+        });
+        
+        // Hata durumunda fallback içgörü göster
+        setStats(prev => ({ 
+          ...prev, 
+          ai_insights: "AI analizi şu anda kullanılamıyor. İstatistiklerinizi manuel olarak inceleyebilirsiniz." 
+        }));
       }
     } catch (err) {
+      console.error('AI Insights hatası:', err);
+      
       toast({
-        title: 'Hata',
-        description: 'AI içgörüleri yüklenemedi',
+        title: 'Bağlantı Hatası',
+        description: 'AI içgörüleri yüklenemedi. Lütfen tekrar deneyin.',
         status: 'error',
-        duration: 3000,
+        duration: 5000,
       });
+      
+      // Network hatası durumunda fallback içgörü göster
+      setStats(prev => ({ 
+        ...prev, 
+        ai_insights: "Bağlantı hatası nedeniyle AI analizi yapılamadı. İstatistiklerinizi manuel olarak inceleyebilirsiniz." 
+      }));
+    } finally {
+      setAiInsightsLoading(false);
     }
   };
 
@@ -393,7 +400,7 @@ const Statistics = () => {
                  <Tabs variant="enclosed">
                    <TabList>
                      <Tab>Günlük Egzersizler</Tab>
-                     <Tab>Haftalık Zorluklar</Tab>
+                     <Tab>Haftalık Görevler</Tab>
                      <Tab>Acil Durum Araçları</Tab>
                    </TabList>
                    
@@ -518,7 +525,7 @@ const Statistics = () => {
           <CardBody>
             <HStack justify="space-between" mb={4}>
               <Heading size="md">İçgörüler</Heading>
-              <Button size="sm" colorScheme="blue" onClick={fetchAIInsights}>
+              <Button size="sm" colorScheme="blue" onClick={fetchAIInsights} isLoading={aiInsightsLoading}>
                 AI İçgörüleri Al
               </Button>
             </HStack>
@@ -534,7 +541,19 @@ const Statistics = () => {
               {ai_insights && (
                 <Box>
                   <Text fontWeight="medium" mb={2}>AI Analizi</Text>
-                  <Text color="gray.700">{ai_insights}</Text>
+                  <Box 
+                    color="gray.700" 
+                    fontSize="sm"
+                    lineHeight="1.6"
+                    whiteSpace="pre-line" // Satır başlarını korumak için bunu geri ekliyoruz
+                    bg="gray.50"
+                    p={4}
+                    borderRadius="md"
+                    border="1px"
+                    borderColor="gray.200"
+                  >
+                    {ai_insights}
+                  </Box>
                 </Box>
               )}
 
@@ -556,18 +575,6 @@ const Statistics = () => {
           </CardBody>
         </Card>
 
-        {/* Sonraki Milestone Bilgisi */}
-        {!isMilestone && entry_count > 0 && (
-          <Alert status="info" variant="subtle">
-            <AlertIcon />
-            <Box>
-              <Text fontWeight="medium">İstatistik Güncellemesi</Text>
-              <Text fontSize="sm">
-                Bir sonraki istatistik güncellemesi için {nextMilestone - entry_count} giriş daha yapmanız gerekiyor.
-              </Text>
-            </Box>
-          </Alert>
-        )}
 
         {/* Risk Dağılımı */}
         {risk_analysis?.risk_distribution && (

@@ -88,10 +88,20 @@ class CognitiveAnalysisAgent:
             model=model_name,
             api_key=api_key,
             temperature=0.0,
-            max_tokens=1500,
-            timeout=30,        # saniye
-            max_retries=2,
+            max_tokens=1000,  # Daha kısa çıktı için azaltıldı
+            timeout=60,        # Timeout artırıldı
+            max_retries=3,     # Retry sayısı artırıldı
             model_kwargs={"response_format": {"type": "json_object"}},
+        )
+
+        # Metin çıktısı için ayrı LLM (JSON formatı zorunluluğu olmadan)
+        self.text_llm = ChatOpenAI(
+            model=model_name,
+            api_key=api_key,
+            temperature=0.7,  # Daha yaratıcı metinler için biraz artırıldı
+            max_tokens=1000,
+            timeout=60,
+            max_retries=3,
         )
 
         # Yapısal çıktı (Pydantic) — AnalysisResult şemasına map eder
