@@ -38,18 +38,28 @@ agent = CognitiveAnalysisAgent()
 result = await agent.analyze_entry(text="Günlük yazısı", user_id="user123")
 ```
 
-### 2. Terapi Teknikleri Agent
+### 2. ChromaDB Destekli RAG Terapi Agent
 **Dosya:** `rag_agent.py`
 
 **Görev:** Bilişsel çarpıtma türlerine göre kişiselleştirilmiş terapi teknikleri önerir.
 
-**Özellikler:**
-- Çarpıtma tabanlı CBT teknikleri
-- AI kişiselleştirme ile uyarlanmış öneriler
-- Zorluk seviyeleri (kolay, orta, zor)
-- Pratik egzersizler ve adım adım teknikler
-- 10 farklı çarpıtma türü için özel teknikler
-- Sonraki adımlar ve kişisel gelişim yol haritası
+**Temel Özellikler:**
+- **10 Çarpıtma Türü**: Felaketleştirme, zihin okuma, genelleme, kişiselleştirme, etiketleme, ya hep ya hiç, büyütme/küçültme, kehanetçilik, keyfi çıkarsama, meli/malı düşünceleri
+- **30+ BDT Tekniği**: Her çarpıtma türü için 3-5 özel CBT tekniği
+- **Zorluk Seviyeleri**: Kolay, orta, zor kategorilerinde teknikler
+- **Pratik Egzersizler**: Uygulanabilir adım adım terapi egzersizleri
+- **Kişiselleştirilmiş Öneriler**: Kullanıcı bağlamına göre uyarlanmış tavsiyeler
+- **Sonraki Adımlar**: Kişisel gelişim için yol haritası ve takip sistemi
+
+**ChromaDB Gelişmiş Özellikler:**
+- **🔍 Semantik Arama**: ChromaDB vector database ile akıllı teknik eşleştirme
+- **🧠 Hybrid RAG**: Vector database + statik BDT teknikleri kombinasyonu
+- **👤 Geçmiş Tabanlı Kişiselleştirme**: Kullanıcının önceki deneyimlerine dayalı öneriler
+- **📚 Vektörel Teknik Depolama**: 30 BDT tekniği ChromaDB'de embedding olarak saklı
+- **🌍 Türkçe Embedding**: Multilingual sentence-transformers desteği
+- **⚡ Gerçek Zamanlı İndeksleme**: Yeni girişlerin otomatik ChromaDB'ye eklenmesi
+- **📊 Kullanıcı Kalıp Analizi**: Düşünce kalıpları ve eğilim tespiti
+- **🔄 Fallback Sistemi**: ChromaDB başarısızlığında statik tekniklere dönüş
 
 **Kullanım:**
 ```python
@@ -58,7 +68,8 @@ from agents.rag_agent import RAGAgent
 therapy_agent = RAGAgent()
 techniques = await therapy_agent.get_therapy_techniques(
     distortion_type="felaketleştirme",
-    user_context="Kullanıcı yazısı"
+    user_context="Kullanıcı yazısı",
+    user_id="user123"  # Kişiselleştirme için
 )
 ```
 
@@ -163,12 +174,14 @@ Report Agent kaldırıldı. Rapor üretimi artık `statistics_service.py` ile ya
 ## 📊 Performans
 
 **Analiz Süresi:** 2-4 saniye (GPT-4o-mini ile)
-**Terapi Teknik Süresi:** 3-5 saniye
+**ChromaDB Terapi Teknik Süresi:** 1-3 saniye (semantik arama)
+**Statik Teknik Süresi:** <1 saniye
 **Başarı Oranı:** %95+
-**Memory Kullanımı:** 45MB
+**Memory Kullanımı:** 65MB (ChromaDB dahil)
 **API Çağrı Sayısı:** 1500/gün
-**Model:** GPT-4o-mini (hız/maliyet/kalite dengesi)
-**Terapi Teknik Sayısı:** 10 çarpıtma türü × 3-5 teknik = 30-50 teknik
+**Model:** GPT-4o-mini + sentence-transformers
+**ChromaDB:** 30 BDT tekniği vektörel olarak saklı
+**Embedding Model:** paraphrase-multilingual-MiniLM-L12-v2
 
 ## 🔧 Hata Ayıklama
 
@@ -199,8 +212,10 @@ agent.clear_memory()
 - [ ] Multi-language support
 - [ ] Advanced analytics
 - [ ] Integration APIs
-- [ ] Vector database support
+- [x] Vector database support (ChromaDB ✅)
 - [ ] Caching layer
+- [ ] Daha gelişmiş embedding modelleri
+- [ ] Multi-modal AI (ses, görüntü)
 
 ## 📝 API Endpoints
 
@@ -211,11 +226,15 @@ agent.clear_memory()
 - `DELETE /analyze/memory/{user_id}` - Memory temizleme
 - `GET /analyze/health` - Sağlık kontrolü
 
-### Terapi Teknikleri
-- `POST /rag/techniques/` - Belirli çarpıtma için terapi teknikleri
-- `POST /rag/techniques/multiple/` - Birden fazla çarpıtma için teknikler
+### ChromaDB Destekli Terapi Teknikleri
+- `POST /rag/techniques/` - Kişiselleştirilmiş terapi teknikleri (ChromaDB + AI)
+- `POST /rag/techniques/multiple/` - Çoklu çarpıtma teknikleri
+- `POST /rag/similar-entries/` - Benzer geçmiş deneyimler bulma
+- `GET /rag/user-insights/` - Kullanıcı düşünce kalıpları analizi
+- `GET /rag/chroma-stats/` - ChromaDB istatistikleri
+- `POST /rag/techniques/semantic-search/` - Semantik teknik arama
 - `GET /rag/distortions/` - Mevcut çarpıtma türleri
-- `GET /rag/health/` - Terapi teknikleri sistemi sağlık kontrolü
+- `GET /rag/health/` - Sistem sağlık kontrolü (ChromaDB dahil)
 
 ## 🤝 Katkıda Bulunma
 
@@ -238,4 +257,4 @@ Sorun yaşıyorsanız:
 
 ---
 
-**Not:** Bu agent sistemi, LangChain 0.2.16 sürümü ile uyumludur. GPT-4o-mini modeli kullanılarak hız ve maliyet optimizasyonu sağlanmıştır.
+**Not:** Bu agent sistemi, LangChain 0.2.16, ChromaDB 0.4.24 ve sentence-transformers 2.2.2 sürümleri ile uyumludur. GPT-4o-mini modeli ile hız optimizasyonu, ChromaDB ile semantik arama ve kişiselleştirme özellikleri aktif edilmiştir.

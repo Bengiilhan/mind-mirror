@@ -11,12 +11,13 @@ Zihin Aynası, kullanıcıların duygularını günlüğe kaydetmelerine ve yaz�
 - **Structured Output**: Pydantic modelleri ile güvenilir JSON çıktısı
 - **Fallback Sistemi**: Çok aşamalı hata yönetimi ve JSON çıkarma
 
-### 💡 Kişiselleştirilmiş Terapi Teknikleri Sistemi
-- **Çarpıtma Tabanlı Teknikler**: Her bilişsel çarpıtma türü için özel CBT teknikleri
-- **AI Kişiselleştirme**: Kullanıcı bağlamına göre uyarlanmış terapi egzersizleri
-- **Zorluk Seviyesi**: Kolay, orta, zor kategorilerinde teknikler
-- **Pratik Egzersizler**: Uygulanabilir adım adım terapi teknikleri
-- **Sonraki Adımlar**: Kişisel gelişim için yol haritası
+### 💡 ChromaDB Destekli RAG Terapi Teknikleri Sistemi
+- **Semantik Arama**: ChromaDB vector database ile akıllı teknik eşleştirme
+- **Hybrid Yaklaşım**: ChromaDB + statik BDT teknikleri kombinasyonu
+- **Kişiselleştirilmiş Öneriler**: Kullanıcı geçmişine dayalı terapi teknikleri
+- **Gerçek Zamanlı İndeksleme**: Yeni girişlerin otomatik ChromaDB'ye eklenmesi
+- **Çok Dilli Embedding**: Türkçe destekli sentence-transformers modeli
+- **Kullanıcı Kalıp Analizi**: Geçmiş deneyimlerden öğrenen AI sistemi
 
 ### 📊 Gelişmiş İstatistikler
 - **Mood Takibi**: Duygu durumu trend analizi ve grafikleri
@@ -45,15 +46,18 @@ mind-mirror/
 ├── backend/
 │   ├── agents/                 # 🤖 AI Agent Sistemi
 │   │   ├── cognitive_agent.py  # Ana analiz agent'ı
-│   │   ├── rag_agent.py        # RAG terapi teknikleri agent'ı
+│   │   ├── rag_agent.py        # ChromaDB destekli RAG agent'ı
 │   │   ├── factory.py          # Agent factory pattern
 │   │   ├── config.py           # Konfigürasyon ayarları
 │   │   └── automation.md       # Otomasyon dokümantasyonu
 │   ├── routers/
 │   │   ├── statistics.py       # İstatistik API'leri
-│   │   └── rag.py              # RAG terapi teknikleri API'leri
+│   │   └── rag.py              # ChromaDB destekli RAG API'leri
 │   ├── services/
-│   │   └── statistics_service.py # İstatistik ve rapor servisleri
+│   │   ├── statistics_service.py # İstatistik ve rapor servisleri
+│   │   └── chroma_service.py   # ChromaDB vector database servisi
+│   ├── scripts/
+│   │   └── load_bdt_techniques.py # BDT teknikleri ChromaDB yükleyici
 │   ├── models.py               # Veritabanı modelleri
 │   ├── schemas.py              # Pydantic şemaları
 │   └── main.py                 # FastAPI uygulaması
@@ -86,6 +90,8 @@ Bu proje iki ana bileşenden oluşur:
 - Node.js (18.x veya üzeri)
 - PostgreSQL veritabanı
 - OpenAI API Key
+- ChromaDB (vector database)
+- Sentence Transformers (embedding modeli)
 
 ---
 
@@ -167,9 +173,9 @@ result = await agent.analyze_entry(
 - **Alternatif Düşünce**: Kişiselleştirilmiş öneriler
 - **Memory Sistemi**: ConversationBufferMemory ile geçmiş hatırlama
 
-### Terapi Teknikleri Agent
+### ChromaDB Destekli RAG Terapi Agent
 
-Çarpıtma türüne göre kişiselleştirilmiş terapi teknikleri öneren agent:
+ChromaDB vector database ile güçlendirilmiş kişiselleştirilmiş terapi teknikleri sistemi:
 
 ```python
 from agents.rag_agent import RAGAgent
@@ -177,17 +183,26 @@ from agents.rag_agent import RAGAgent
 therapy_agent = RAGAgent()
 techniques = await therapy_agent.get_therapy_techniques(
     distortion_type="felaketleştirme",
-    user_context="Kullanıcı yazısı"
+    user_context="Kullanıcı yazısı",
+    user_id="user123"  # Kişiselleştirme için
 )
 ```
 
-**Özellikler:**
-- **Çarpıtma Tabanlı Teknikler**: Her bilişsel çarpıtma türü için özel CBT teknikleri
-- **AI Kişiselleştirme**: Kullanıcı bağlamına göre uyarlanmış öneriler
+**Temel Özellikler:**
+- **10 Çarpıtma Türü**: Felaketleştirme, zihin okuma, genelleme, kişiselleştirme, etiketleme, ya hep ya hiç, büyütme/küçültme, kehanetçilik, keyfi çıkarsama, meli/malı düşünceleri
+- **30+ BDT Tekniği**: Her çarpıtma türü için 3-5 özel CBT tekniği
 - **Zorluk Seviyeleri**: Kolay, orta, zor kategorilerinde teknikler
-- **Pratik Egzersizler**: Uygulanabilir adım adım terapi teknikleri
-- **Sonraki Adımlar**: Kişisel gelişim için yol haritası
-- **10 Çarpıtma Türü**: Her çarpıtma için özel teknikler
+- **Pratik Egzersizler**: Uygulanabilir adım adım terapi egzersizleri
+- **Kişiselleştirilmiş Öneriler**: Kullanıcı bağlamına göre uyarlanmış tavsiyeler
+
+**ChromaDB Gelişmiş Özellikler:**
+- **🔍 Semantik Arama**: ChromaDB ile akıllı teknik eşleştirme
+- **🧠 Hybrid RAG**: Vector database + statik BDT teknikleri
+- **👤 Geçmiş Tabanlı Kişiselleştirme**: Kullanıcının önceki deneyimlerine dayalı öneriler
+- **📚 Vektörel Teknik Depolama**: ChromaDB'de embedding olarak saklanan teknikler
+- **🌍 Türkçe Embedding**: Multilingual sentence-transformers desteği
+- **⚡ Gerçek Zamanlı**: Otomatik veri indeksleme ve arama
+- **📊 Kullanıcı İçgörüleri**: Geçmiş kalıp analizi
 
 ### Statistics Service
 
@@ -254,11 +269,15 @@ available_agents = agent_factory.get_available_agents()
 - `GET /analyze/memory/{user_id}` - Kullanıcı memory'si
 - `DELETE /analyze/memory/{user_id}` - Memory temizleme
 
-### Terapi Teknikleri
-- `POST /rag/techniques/` - Belirli çarpıtma için terapi teknikleri
-- `POST /rag/techniques/multiple/` - Birden fazla çarpıtma için teknikler
+### ChromaDB Destekli Terapi Teknikleri
+- `POST /rag/techniques/` - Kişiselleştirilmiş terapi teknikleri (ChromaDB + AI)
+- `POST /rag/techniques/multiple/` - Çoklu çarpıtma teknikleri
+- `POST /rag/similar-entries/` - Benzer geçmiş deneyimler bulma
+- `GET /rag/user-insights/` - Kullanıcı düşünce kalıpları analizi
+- `GET /rag/chroma-stats/` - ChromaDB istatistikleri
+- `POST /rag/techniques/semantic-search/` - Semantik teknik arama
 - `GET /rag/distortions/` - Mevcut çarpıtma türleri
-- `GET /rag/health/` - Terapi teknikleri sistemi sağlık kontrolü
+- `GET /rag/health/` - Sistem sağlık kontrolü (ChromaDB dahil)
 
 ### İstatistikler
 - `GET /statistics/` - Kullanıcı istatistikleri
@@ -291,9 +310,10 @@ python -m pytest test_*.py
 - [ ] Multi-language support
 - [ ] Advanced analytics dashboard
 - [ ] Integration APIs
-- [ ] Vector database support
 - [ ] Caching layer
 - [ ] Mobile app development
+- [ ] Voice input/output
+- [ ] Daha gelişmiş embedding modelleri
 
 ---
 
@@ -338,5 +358,5 @@ Sistemi test etmek için bu yazıyı kopyalayıp yeni günlük girişi sayfasın
 
 ---
 
-**Not:** Bu proje LangChain 0.2.16 sürümü ile uyumludur. GPT-4o-mini modeli kullanılarak hız ve maliyet optimizasyonu sağlanmıştır. Structured output ve fallback sistemi ile güvenilir analiz sonuçları garanti edilir.
+**Not:** Bu proje LangChain 0.2.16, ChromaDB 0.4.24 ve sentence-transformers 2.2.2 sürümleri ile uyumludur. GPT-4o-mini modeli kullanılarak hız ve maliyet optimizasyonu sağlanmıştır. ChromaDB vector database ile semantik arama ve kişiselleştirme özellikleri aktif edilmiştir.
 

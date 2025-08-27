@@ -100,7 +100,6 @@ def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_us
     # Frontend'den gelen analiz sonucunu kontrol et
     if hasattr(entry, 'analysis') and entry.analysis:
         analysis_data = entry.analysis
-        print("✅ Frontend'den gelen analiz sonucu kullanılıyor")
     else:
         # Yeni analiz yap
         try:
@@ -119,11 +118,9 @@ def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_us
                     )
                 )
                 analysis_data = analysis_result
-                print(f"✅ Yeni analiz yapıldı: {len(analysis_result.get('distortions', []))} çarpıtma")
             finally:
                 loop.close()
         except Exception as e:
-            print(f"❌ Analiz hatası: {e}")
             analysis_data = {
                 "distortions": [],
                 "overall_mood": "belirsiz",
@@ -140,6 +137,32 @@ def create_entry(entry: EntryCreate, current_user: User = Depends(get_current_us
         db.add(db_analysis)
         db.commit()
         db.refresh(db_analysis)
+        
+        # ChromaDB'ye entry ve analiz sonucunu ekle
+        try:
+            from agents.rag_agent import RAGAgent
+            rag_agent = RAGAgent()
+            
+            # Entry'yi ChromaDB'ye ekle (async olarak)
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                loop.run_until_complete(
+                    rag_agent.add_user_entry_to_chroma(
+                        entry_id=str(db_entry.id),
+                        user_id=str(current_user.id),
+                        text=entry.text,
+                        analysis_result=analysis_data
+                    )
+                )
+            finally:
+                loop.close()
+                
+        except Exception:
+            # ChromaDB hatası ana işlemi etkilemesin
+            pass
 
     entry_dict = {
         "id": db_entry.id,

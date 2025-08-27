@@ -13,6 +13,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 
+# ChromaDB entegrasyonu
+from services.chroma_service import get_chroma_service
+
 # -----------------------------------------------------------------------------
 # Logging konfigürasyonu
 # -----------------------------------------------------------------------------
@@ -325,6 +328,16 @@ class RAGAgent:
         model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         api_key = os.getenv("OPENAI_API_KEY")
 
+        # ChromaDB servisi
+        try:
+            self.chroma_service = get_chroma_service()
+            self.use_chroma = True
+            logger.info("ChromaDB servisi başarıyla başlatıldı")
+        except Exception as e:
+            logger.warning(f"ChromaDB başlatılamadı: {e}. Fallback moda geçiliyor.")
+            self.chroma_service = None
+            self.use_chroma = False
+
         if not api_key:
             logger.warning("OPENAI_API_KEY bulunamadı. RAG sistemi API key olmadan çalışacak.")
             self.llm = None
@@ -345,38 +358,71 @@ class RAGAgent:
                 self.llm = None
                 self.structured_llm = None
 
-    async def get_therapy_techniques(self, distortion_type: str, user_context: Optional[str] = None) -> Dict[str, Any]:
-        """Belirli bir çarpıtma türü için terapi teknikleri önerir"""
+    async def get_therapy_techniques(self, distortion_type: str, user_context: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Belirli bir çarpıtma türü için terapi teknikleri önerir (ChromaDB + Statik)"""
         try:
             # Çarpıtma türünü normalize et
             normalized_type = self._normalize_distortion_type(distortion_type)
             
-            if normalized_type not in BDT_TECHNIQUES:
-                return self._get_fallback_response(distortion_type)
-
-            # Temel teknikleri al
-            base_techniques = BDT_TECHNIQUES[normalized_type]
+            # Hybrid yaklaşım: ChromaDB + Statik BDT_TECHNIQUES
+            chroma_techniques = []
+            static_techniques = []
             
-            # Kullanıcı bağlamı varsa kişiselleştir
-            if user_context:
+            # 1. ChromaDB'den semantik arama
+            if self.use_chroma and user_context:
+                try:
+                    chroma_techniques = await self.chroma_service.find_relevant_techniques(
+                        query_text=user_context,
+                        distortion_types=[normalized_type],
+                        n_results=3
+                    )
+                    logger.info(f"ChromaDB'den {len(chroma_techniques)} teknik bulundu")
+                except Exception as e:
+                    logger.warning(f"ChromaDB arama hatası: {e}")
+            
+            # 2. Statik teknikleri al
+            if normalized_type in BDT_TECHNIQUES:
+                static_techniques = BDT_TECHNIQUES[normalized_type]["techniques"]
+            else:
+                return self._get_fallback_response(distortion_type)
+            
+            # 3. Teknikleri birleştir (ChromaDB öncelikli)
+            combined_techniques = self._combine_techniques(chroma_techniques, static_techniques)
+            
+            # 4. Kişiselleştirme
+            if user_context and user_id:
+                personalized_response = await self._personalize_with_history(
+                    techniques=combined_techniques,
+                    user_context=user_context,
+                    user_id=user_id,
+                    distortion_type=normalized_type
+                )
+                return personalized_response
+            elif user_context:
+                # Basit kişiselleştirme
                 personalized_response = await self._personalize_techniques(
-                    base_techniques, user_context, distortion_type
+                    {"techniques": combined_techniques, "name": BDT_TECHNIQUES[normalized_type]["name"]},
+                    user_context, 
+                    distortion_type
                 )
                 return personalized_response
             
-            # Temel yanıtı döndür
+            # 5. Temel yanıt
+            base_techniques = BDT_TECHNIQUES[normalized_type]
             return {
                 "distortion_type": normalized_type,
                 "distortion_name": base_techniques["name"],
                 "distortion_description": base_techniques["description"],
-                "techniques": base_techniques["techniques"],
-                "personalized_advice": f"{base_techniques['name']} çarpıtması için özel teknikler hazırladık. Bu teknikleri günlük rutininize ekleyerek daha sağlıklı düşünce kalıpları geliştirebilirsiniz.",
+                "techniques": combined_techniques,
+                "personalized_advice": f"{base_techniques['name']} çarpıtması için ChromaDB'den geliştirilmiş teknikler hazırladık.",
                 "next_steps": [
                     "Önerilen tekniklerden birini seçin ve bugün uygulayın",
                     "Haftada en az 3 kez bu teknikleri tekrarlayın",
                     "İlerlemenizi günlüğünüzde takip edin",
                     "Zorlandığınızda bir uzmandan destek almayı düşünün"
                 ],
+                "source": "hybrid" if chroma_techniques else "static",
+                "chroma_results": len(chroma_techniques),
                 "generated_at": datetime.now().isoformat()
             }
 
@@ -384,12 +430,12 @@ class RAGAgent:
             logger.exception("RAG teknikleri alma hatası")
             return self._get_fallback_response(distortion_type)
 
-    async def get_multiple_techniques(self, distortion_types: List[str], user_context: Optional[str] = None) -> Dict[str, Any]:
+    async def get_multiple_techniques(self, distortion_types: List[str], user_context: Optional[str] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Birden fazla çarpıtma türü için teknikler önerir"""
         try:
             all_techniques = []
             for distortion_type in distortion_types:
-                techniques = await self.get_therapy_techniques(distortion_type, user_context)
+                techniques = await self.get_therapy_techniques(distortion_type, user_context, user_id)
                 all_techniques.append(techniques)
 
             return {
@@ -526,3 +572,289 @@ class RAGAgent:
         for distortion_type, data in BDT_TECHNIQUES.items():
             summary[data["name"]] = len(data["techniques"])
         return summary
+
+    # -----------------------------------------------------------------------------
+    # ChromaDB Entegrasyon Metotları
+    # -----------------------------------------------------------------------------
+    
+    def _combine_techniques(self, chroma_techniques: List[Dict], static_techniques: List[Dict]) -> List[Dict]:
+        """ChromaDB ve statik teknikleri birleştirir"""
+        try:
+            combined = []
+            
+            # ChromaDB tekniklerini işle - gerçek BDT teknik içeriğini al
+            for chroma_tech in chroma_techniques:
+                metadata = chroma_tech.get('metadata', {})
+                document_text = chroma_tech.get('text', '')
+                
+                # Document text'inden teknik bilgilerini çıkar
+                technique_data = self._parse_technique_from_document(document_text, metadata)
+                technique_data["source"] = "chromadb"
+                technique_data["relevance_score"] = chroma_tech.get('relevance_score', 0.5)
+                combined.append(technique_data)
+            
+            # Statik teknikleri ekle (ChromaDB sonuçları yeterli değilse)
+            if len(combined) < 3:
+                for static_tech in static_techniques[:3-len(combined)]:
+                    static_tech_copy = static_tech.copy()
+                    static_tech_copy["source"] = "static"
+                    combined.append(static_tech_copy)
+            
+            return combined[:3]  # En fazla 3 teknik döndür
+            
+        except Exception as e:
+            logger.error(f"Teknik birleştirme hatası: {e}")
+            return static_techniques[:3]  # Fallback
+    
+    def _parse_technique_from_document(self, document_text: str, metadata: Dict) -> Dict:
+        """ChromaDB document text'inden teknik bilgilerini çıkarır"""
+        try:
+            # Document text formatı:
+            # """
+            # Başlık: Teknik Başlığı
+            # Açıklama: Teknik açıklaması
+            # Egzersiz: Egzersiz açıklaması
+            # Çarpıtma Türü: ...
+            # """
+            
+            lines = document_text.strip().split('\n')
+            technique_data = {
+                "title": metadata.get('title', 'Bilinmeyen Teknik'),
+                "description": "Teknik açıklaması bulunamadı",
+                "exercise": "Egzersiz açıklaması bulunamadı",
+                "duration": metadata.get('duration', '10-15 dakika'),
+                "difficulty": metadata.get('difficulty', 'orta')
+            }
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith('Başlık:'):
+                    technique_data["title"] = line.replace('Başlık:', '').strip()
+                elif line.startswith('Açıklama:'):
+                    technique_data["description"] = line.replace('Açıklama:', '').strip()
+                elif line.startswith('Egzersiz:'):
+                    technique_data["exercise"] = line.replace('Egzersiz:', '').strip()
+            
+            # Metadata'dan gelen title'ı kullan (daha güvenilir)
+            if metadata.get('title'):
+                technique_data["title"] = metadata['title']
+            
+            # Eğer hala açıklama bulunamadıysa, statik BDT_TECHNIQUES'den al
+            if technique_data["description"] == "Teknik açıklaması bulunamadı":
+                distortion_type = metadata.get('distortion_type', '')
+                technique_data = self._get_static_technique_backup(distortion_type, metadata.get('title', ''))
+                technique_data["duration"] = metadata.get('duration', technique_data.get('duration', '10-15 dakika'))
+                technique_data["difficulty"] = metadata.get('difficulty', technique_data.get('difficulty', 'orta'))
+            
+            return technique_data
+            
+        except Exception as e:
+            logger.error(f"Document parsing hatası: {e}")
+            # Fallback: metadata'dan ne varsa kullan
+            return {
+                "title": metadata.get('title', 'ChromaDB Tekniği'),
+                "description": f"Bu teknik {metadata.get('distortion_type', 'bilişsel çarpıtma')} için önerilmiştir.",
+                "exercise": "Günlük yazmaya devam edin ve bu durumu daha objektif açıdan değerlendirmeye çalışın.",
+                "duration": metadata.get('duration', '10-15 dakika'),
+                "difficulty": metadata.get('difficulty', 'orta')
+            }
+    
+    def _get_static_technique_backup(self, distortion_type: str, title: str) -> Dict:
+        """Statik BDT_TECHNIQUES'den backup teknik al"""
+        try:
+            if distortion_type in BDT_TECHNIQUES:
+                techniques = BDT_TECHNIQUES[distortion_type]["techniques"]
+                # Title'a en yakın tekniği bul
+                for tech in techniques:
+                    if title.lower() in tech.get("title", "").lower():
+                        return tech.copy()
+                # Bulamazsa ilk tekniği döndür
+                if techniques:
+                    return techniques[0].copy()
+            
+            # Hiçbir şey bulamazsa default
+            return {
+                "title": title or "Genel BDT Tekniği",
+                "description": "Bu teknik düşünce kalıplarınızı iyileştirmenize yardımcı olur.",
+                "exercise": "Durumu farklı açılardan değerlendirin ve daha dengeli düşünceler geliştirin.",
+                "duration": "10-15 dakika",
+                "difficulty": "orta"
+            }
+            
+        except Exception as e:
+            logger.error(f"Static backup hatası: {e}")
+            return {
+                "title": "Genel Teknik",
+                "description": "Düşünce kalıplarınızı gözden geçirin.",
+                "exercise": "Günlük yazılarınızda tekrar eden kalıpları fark edin.",
+                "duration": "5-10 dakika",
+                "difficulty": "kolay"
+            }
+    
+    async def _personalize_with_history(
+        self, 
+        techniques: List[Dict], 
+        user_context: str, 
+        user_id: str, 
+        distortion_type: str
+    ) -> Dict[str, Any]:
+        """Kullanıcının geçmiş verileriyle kişiselleştirme yapar"""
+        try:
+            # Kullanıcının geçmiş benzer deneyimlerini bul
+            similar_entries = []
+            user_patterns = {}
+            
+            if self.use_chroma:
+                # Benzer geçmiş girişler
+                similar_entries = await self.chroma_service.find_similar_entries(
+                    user_id=user_id,
+                    query_text=user_context,
+                    distortion_type=distortion_type,
+                    n_results=3
+                )
+                
+                # Kullanıcı kalıpları
+                user_patterns = await self.chroma_service.get_user_patterns(user_id)
+            
+            # Kişiselleştirilmiş tavsiye oluştur
+            personalized_advice = await self._generate_personalized_advice(
+                user_context=user_context,
+                distortion_type=distortion_type,
+                similar_entries=similar_entries,
+                user_patterns=user_patterns,
+                techniques=techniques
+            )
+            
+            base_info = BDT_TECHNIQUES.get(distortion_type, {})
+            
+            return {
+                "distortion_type": distortion_type,
+                "distortion_name": base_info.get("name", distortion_type),
+                "distortion_description": base_info.get("description", ""),
+                "techniques": techniques,
+                "personalized_advice": personalized_advice,
+                "similar_experiences_count": len(similar_entries),
+                "user_patterns": user_patterns.get('most_common_distortions', [])[:3] if user_patterns else [],
+                "next_steps": self._generate_personalized_next_steps(user_patterns, techniques),
+                "source": "personalized_chromadb",
+                "generated_at": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Kişiselleştirme hatası: {e}")
+            # Fallback: basit kişiselleştirme
+            return await self._personalize_techniques(
+                {"techniques": techniques, "name": BDT_TECHNIQUES.get(distortion_type, {}).get("name", "")},
+                user_context,
+                distortion_type
+            )
+    
+    async def _generate_personalized_advice(
+        self,
+        user_context: str,
+        distortion_type: str,
+        similar_entries: List[Dict],
+        user_patterns: Dict,
+        techniques: List[Dict]
+    ) -> str:
+        """LLM ile kişiselleştirilmiş tavsiye oluşturur"""
+        try:
+            if not self.llm:
+                return f"{distortion_type} çarpıtması için kişiselleştirilmiş teknikler hazırlandı."
+            
+            # Kontext hazırla
+            context_parts = [f"Mevcut durum: {user_context}"]
+            
+            if similar_entries:
+                context_parts.append(f"Benzer geçmiş deneyimler: {len(similar_entries)} adet")
+            
+            if user_patterns and user_patterns.get('most_common_distortions'):
+                common = user_patterns['most_common_distortions'][:3]
+                context_parts.append(f"En sık karşılaştığınız çarpıtmalar: {', '.join([c[0] for c in common])}")
+            
+            prompt = f"""
+            Kullanıcı profili: {' | '.join(context_parts)}
+            Çarpıtma türü: {distortion_type}
+            Önerilen teknik sayısı: {len(techniques)}
+            
+            Bu kullanıcı için kişiselleştirilmiş, destekleyici ve cesaret verici bir tavsiye yazın.
+            - Kullanıcının durumuna özel olarak konuşun
+            - Geçmiş deneyimlerinden faydalanın
+            - Pratik ve uygulanabilir olsun
+            - 2-3 cümle ile sınırlayın
+            - Türkçe yazın ve "sen" hitabı kullanın
+            """
+            
+            response = await self.llm.ainvoke(prompt)
+            return response.content.strip()
+            
+        except Exception as e:
+            logger.error(f"Kişiselleştirilmiş tavsiye oluşturma hatası: {e}")
+            return f"{distortion_type} çarpıtması için geçmiş deneyimlerinize dayalı özel teknikler hazırladık."
+    
+    def _generate_personalized_next_steps(self, user_patterns: Dict, techniques: List[Dict]) -> List[str]:
+        """Kullanıcı kalıplarına göre sonraki adımları oluşturur"""
+        try:
+            base_steps = [
+                "Bu kişiselleştirilmiş tavsiyeyi günlüğünüze not edin",
+                "En uygun tekniği seçip bu hafta düzenli uygulayın"
+            ]
+            
+            # Kullanıcı kalıplarına göre ek adımlar
+            if user_patterns:
+                total_analyses = user_patterns.get('total_analyses', 0)
+                
+                if total_analyses < 5:
+                    base_steps.append("Daha fazla analiz için günlük yazmaya devam edin")
+                elif total_analyses >= 10:
+                    base_steps.append("İlerleme kaydınızı gözden geçirin ve başarılarınızı kutlayın")
+                
+                # Risk seviyesi kontrolü
+                risk_dist = user_patterns.get('risk_level_distribution', {})
+                if risk_dist.get('high', 0) > 0:
+                    base_steps.append("Yüksek risk dönemlerinde profesyonel destek almayı değerlendirin")
+            
+            base_steps.append("İlerlemenizi takip etmek için günlük yazmaya devam edin")
+            
+            return base_steps
+            
+        except Exception as e:
+            logger.error(f"Kişiselleştirilmiş adım oluşturma hatası: {e}")
+            return [
+                "Önerilen tekniklerden birini seçin ve bugün uygulayın",
+                "Haftada en az 3 kez bu teknikleri tekrarlayın",
+                "İlerlemenizi günlüğünüzde takip edin"
+            ]
+    
+    # -----------------------------------------------------------------------------
+    # ChromaDB Data Management
+    # -----------------------------------------------------------------------------
+    
+    async def add_user_entry_to_chroma(self, entry_id: str, user_id: str, text: str, analysis_result: Dict[str, Any]) -> bool:
+        """Kullanıcı girişini ChromaDB'ye ekler"""
+        try:
+            if not self.use_chroma:
+                return False
+                
+            return await self.chroma_service.add_user_entry(
+                entry_id=str(entry_id),
+                user_id=str(user_id),
+                text=text,
+                analysis_result=analysis_result
+            )
+            
+        except Exception as e:
+            logger.error(f"ChromaDB'ye entry ekleme hatası: {e}")
+            return False
+    
+    async def get_user_insights(self, user_id: str) -> Dict[str, Any]:
+        """Kullanıcının düşünce kalıpları hakkında içgörüler"""
+        try:
+            if not self.use_chroma:
+                return {"message": "ChromaDB mevcut değil"}
+                
+            return await self.chroma_service.get_user_patterns(user_id)
+            
+        except Exception as e:
+            logger.error(f"Kullanıcı içgörüleri hatası: {e}")
+            return {"error": "İçgörüler alınamadı"}

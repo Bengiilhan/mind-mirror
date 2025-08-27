@@ -9,13 +9,19 @@ from models import User
 from database import get_db
 
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") 
 
+if not SECRET_KEY:
+    SECRET_KEY = "fallback_secret_key_for_development_only"
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+logger = logging.getLogger(__name__)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -72,7 +78,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         
         return user
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Authentication failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed",
